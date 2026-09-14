@@ -104,3 +104,58 @@ La sécurité interne des services d'intelligence artificielle publics utilisés
 L'étude porte donc principalement sur la manière dont Frugal Training communique avec ces services, sur les données qui leur sont transmises et sur la protection des informations permettant d'y accéder.
 
 De la même manière, les aspects purement artistiques ou graphiques de l'installation ne constituent pas le cœur de ce dossier de sécurité. Ils peuvent toutefois être pris en compte lorsqu'ils ont une incidence sur la sécurité ou le fonctionnement de l'infrastructure informatique.
+
+
+# 2\. Savoir ce qu'on protège
+
+Avant de choisir des protections, il faut lister ce qui a de la valeur et ce qui peut mal tourner. Sinon on pourrait se retrouver à oublier des choses à protéger.
+
+## 2.1 Les biens
+
+| Bien | Risque |
+| --- | --- |
+| Les documents nourrissant l'IA | L'IA change de discours sans qu'on comprenne pourquoi |
+| Le questionnaire et son barème | Les scores affichés sont faux |
+| L'historique des sessions | On perd les résultats de l'exposition |
+| Personas (prompts système) | L'IA joue un autre personnage que prévu |
+| Les modèles téléchargés | Plusieurs Go à retélécharger en plein festival |
+| Secrets (clés d'API, mots de passe) | Quelqu'un d'autre s'en sert, le quota s'épuise et l'IA ne répond plus |
+| La machine allumée | L'œuvre s'arrête en pleine exposition |
+
+Rien là-dedans n'est confidentiel, sauf les secrets. Les documents viennent d'internet, les scores sont faits pour être affichés à l'écran, et le public ne laisse aucune donnée personnelle.
+
+Ce qui compte ici, c'est l'exactitude des données et que la machine tourne.
+
+## 2.2 Ce qui sort de la machine
+
+L'installation fait dialoguer une IA sur la machine et une IA en ligne. À chaque question posée, quelque chose part vers l'extérieur.
+
+Ce que le programme envoie exprès : les questions du questionnaire, les messages écrits par l'IA locale, et les informations techniques de la requête.
+
+Ce qui revient : les réponses de l'IA en ligne.
+
+Ce trafic est prévu et connu. Mais une machine ne se limite pas à ce qu'on lui a demandé de faire : Windows vérifie ses mises à jour et transmet des données de diagnostic, les logiciels installés contactent leurs propres serveurs, et certains services se signalent d'eux-mêmes aux autres appareils du réseau.
+
+Tout cela part vers des destinations que personne dans le groupe n'a choisies, et en dit beaucoup sur la machine : nom de l'appareil, version du système, versions des logiciels installés. Les failles connues de ces versions sont répertoriées publiquement, avec souvent la façon de les exploiter. Une machine qui annonce sa version annonce donc aussi ce qui marche contre elle.
+
+C'est l'objectif du pare-feu : autoriser les appels à l'IA en ligne, bloquer tout le reste. Les blocages sont enregistrés, ce qui permet de vérifier ce qui a réellement essayé de sortir.
+
+## 2.3 La machine et le clavier
+
+La machine est un mini-PC (NUC) accroché au mur, allumé plusieurs jours dans un lieu public, sans personne à côté.
+
+Le clavier sert à choisir un persona. Mais un clavier reste un clavier : il envoie n'importe quelle touche à n'importe quel programme, et rien n'empêche un visiteur de s'en servir pour sortir de l'œuvre et atteindre le système. La machine elle-même est à portée de main, avec ses ports et son bouton d'alimentation.
+
+Et comme il y a deux enceintes, une IA détournée ne se contente pas d'afficher n'importe quoi : elle peut le dire à voix haute, devant le public.
+
+## 2.4 Les risques
+
+| Ce qui peut arriver | À cause de quoi | Gravité |
+| --- | --- | --- |
+| Un visiteur sort de l'œuvre et atteint le système | Clavier mural | Élevée |
+| La machine s'arrête et ne repart pas | Panne, coupure de courant | Élevée |
+| La machine renseigne l'extérieur sur elle-même et sur le réseau | Mises à jour, services qui se signalent | Moyenne |
+| Une clé d'API se retrouve sur GitHub | Erreur dans un commit | Moyenne |
+| Le score affiché ne correspond pas à la réponse donnée | Score non vérifié avant affichage | Moyenne |
+
+La panne n'est pas une attaque, mais son effet est identique : l'œuvre ne fonctionne plus. Pendant une exposition, elle est plus probable qu'une intrusion. C'est le risque qui justifie les sauvegardes.
