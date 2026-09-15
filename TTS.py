@@ -77,7 +77,7 @@ async def playback_worker(queue):
             pending_audio[index] = filename
             queue.task_done()
 
-async def synthesize_sentence(sentence, index, queue):
+async def synthesize_sentence(sentence, voice, index, queue):
     """
     Generates the audio file and sends it to the player queue
     In: sentence    (string)
@@ -89,12 +89,12 @@ async def synthesize_sentence(sentence, index, queue):
     assert type(queue) ==  asyncio.Queue, f"queue must be an asyncio.Queue and is {type(queue)}"
 
     filename = f"temp_audio_{index}.mp3"
-    communicate = edge_tts.Communicate(sentence, "fr-FR-EloiseNeural", rate="+15%", volume="+0%", pitch="+0Hz")
+    communicate = edge_tts.Communicate(sentence, voice, rate="+15%", volume="+0%", pitch="+0Hz")
     await communicate.save(filename)
 
     await queue.put((index, filename))
 
-async def llm_stream_to_speech(stream):
+async def llm_stream_to_speech(stream, voice):
     """
     Read the llm stream out loud and print out the text in real time.
     In: stream (async generator)
@@ -120,7 +120,7 @@ async def llm_stream_to_speech(stream):
             # Ensure the string has playable characters to prevent crashes
             if re.search(r'[a-zA-Z0-9À-ÿ]', clean_sentence):
                 task = asyncio.create_task(
-                    synthesize_sentence(clean_sentence, sentence_index, audio_queue)
+                    synthesize_sentence(clean_sentence, voice, sentence_index, audio_queue)
                 )
                 synthesis_tasks.append(task)
                 sentence_index += 1
@@ -129,7 +129,7 @@ async def llm_stream_to_speech(stream):
 
     if synthesis_tasks:
         await asyncio.gather(*synthesis_tasks)
-        
+
     await audio_queue.join()
     
     await audio_queue.put((sentence_index, None))
@@ -138,4 +138,4 @@ async def llm_stream_to_speech(stream):
     print("\n[Finished]")
 
 if __name__ == "__main__":
-    asyncio.run(llm_stream_to_speech(mock_llm_stream()))
+    asyncio.run(llm_stream_to_speech(mock_llm_stream(), "fr-CA-AntoineNeural"))

@@ -43,7 +43,7 @@ async def main():
     print(f"Utilisateur: {prompt}\n")
     
     # On crée le flux Gemini
-    stream = gemini_llm_stream(prompt)
+    stream = gemini_llm_stream(prompt, "fr-CA-AntoineNeural")
     
     # On passe ce flux à votre script EdgeTTS.py
     await EdgeTTS.llm_stream_to_speech(stream)
