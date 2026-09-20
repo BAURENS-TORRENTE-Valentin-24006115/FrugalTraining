@@ -1,0 +1,23 @@
+# Dependencies directory (cloned repos & binaries)
+ai-server/deps/
+
+# Models directory
+ai-server/models/
+
+# Orchestrator & Beacon runtime state / config overrides
+ai-server/state.json
+ai-server/*.env
+ai-server/deps/MAIA-Beacon/.env
+
+# Python byte code & environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
+
+# Build artifacts & logs
+build/
+dist/
+*.log
