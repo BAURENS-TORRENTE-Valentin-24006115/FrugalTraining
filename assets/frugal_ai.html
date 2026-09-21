@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang='fr'>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <title>IA Frugal</title>
+    <link rel='stylesheet' href='css/main.css'>
+</head>
+<body>
+    <main class='dashboard'>
+        <section class='top-panel'>
+            <aside class='score-panel'>
+                <div class='user-icon' aria-hidden='true'><span></span></div>
+                <h1 id='role-header'>Role: ...</h1>
+                <p class='score-summary'>Moyenne du score<br>des IA:<br><strong id='average-score-text'>--/100</strong></p>
+                <h2>Tableaux des<br>scores</h2>
+                <div class='chart' aria-label='Score comparatif des modèles'>
+                    <div class='chart-scale'><span>100</span><span>80</span><span>60</span><span>40</span><span>20</span><span>0</span></div>
+                    <div class='chart-grid' id='chart-grid'></div>
+                    <div class='chart-labels' id='chart-labels'></div>
+                </div>
+            </aside>
+            <article class='response-panel'>
+                <p id='ai-reponse'></p>
+            </article>
+        </section>
+        <section class='bottom-panel'>
+            <aside class='score-panel' id='roles-list'>
+                <!-- Dynamically generated roles -->
+            </aside>
+            <div class='compact'></div>
+            <article class='model-list' id='models-list'>
+                <!-- Dynamically generated models -->
+            </article>
+        </section>
+    </main>
+    <script src="scripts/main.js"></script>
+</body>
+</html>

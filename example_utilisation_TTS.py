@@ -1,13 +1,8 @@
 import asyncio
 from google import genai
+import tts
 
-# On importe votre script
-import TTS 
-
-# Configuration de l'API Gemini
-API_KEY = "VOTRE_CLE_API_GEMINI_ICI" 
-
-# Initialisation du client
+API_KEY = "VOTRE_CLE_API_GEMINI_ICI"
 client = genai.Client(api_key=API_KEY)
 
 async def gemini_llm_stream(prompt):
@@ -45,8 +40,8 @@ async def main():
     # On crée le flux Gemini
     stream = gemini_llm_stream(prompt)
 
-    # On passe ce flux à votre script TTS.py
-    await TTS.llm_stream_to_speech(stream, "fr-CA-AntoineNeural")
+    # On passe ce flux à votre script tts.py
+    await tts.llm_stream_to_speech(stream, "fr-CA-AntoineNeural")
 
 if __name__ == "__main__":
     asyncio.run(main())
