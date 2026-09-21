@@ -3,30 +3,81 @@
 <head>
     <meta charset='utf-8'>
     <meta name='viewport' content='width=device-width, initial-scale=1'>
-    <title>Page Title</title>
+    <title>Page IA Frugal</title>
     <link rel='stylesheet' href='css/main.css'>
 </head>
 <body>
-    <section class='main'>
-        <article>
-            <h1>Bienvenue sur notre page</h1>
-            <p>Ceci est un exemple de page HTML avec un champ de saisie et un affichage de résultat.</p>
-        </article>
-        <aside>
-            <h2>Instructions</h2>
-            <p>Veuillez entrer votre texte dans le champ ci-dessous et appuyez sur Entrée pour voir le résultat.</p>
-        </aside>
-    </section>
-    <separator></separator>
-    <section class='main'>
-        <dl id='output'>
-            <dt>Résultat :</dt>
-            <dd id='result'>ff</dd>
-        </dl>
-        <dl>
-            <dt>Entrée :</dt>
-            <dd><input type='text' id='inputField' placeholder='Entrez votre texte ici'></dd>
-        </dl>
-    </section>
+    <main class='dashboard'>
+        <section class='dashboard__top'>
+            <aside class='profile-panel' aria-label='Profil et scores'>
+                <div class='profile-mark' aria-hidden='true'>
+                    <span></span>
+                </div>
+                <div class='profile-copy'>
+                    <strong>Role: Prêtre</strong>
+                    <p>Moyenne du score<br>de l'IA actuelle:<br><b>24/100</b></p>
+                    <h2>Tableaux des<br>scores</h2>
+                </div>
+                <img class='profile-chart' src='img/profile-chart.png' alt='Graphique des scores GPT, Gemini, Mistral et Deepseek'>
+            </aside>
+
+            <article class='response-panel'>
+                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce at lectus sollicitudin, vestibulum nisi eu, pellentesque odio. In ac lacinia nisi. Interdum et malesuada fames ac ante ipsum primis in faucibus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum sed ipsum laoreet nibh eleifend convallis. In id sollicitudin est. Quisque non accumsan sem. Pellentesque in laoreet purus. Maecenas quis sapien nec nisl vehicula ultrices ut sodales orci.</p>
+                <p>Nunc eget dolor sit amet dolor interdum sollicitudin nec nec ex. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Integer at leo et risus tempus tincidunt. In tincidunt elit risus, sed condimentum sem malesuada eu. Interdum et malesuada fames ac ante ipsum primis in faucibus. Duis aliquam felis ex, id blandit nulla elementum pharetra. Donec ultrices nisi vitae magna sagittis, ac ultricies mi blandit. Vivamus massa lorem, viverra eu varius vel, volutpat at sem. Suspendisse potenti. Mauris tristique lectus tristique magna bibendum faucibus. Donec ornare luctus libero non pharetra. Sed magna sapien, venenatis at tortor a, euismod convallis ligula. Suspendisse potenti. Maecenas dictum sit amet odio eu elementum.</p>
+                <p>Nullam et risus ipsum. Mauris tristique ligula tellus, at lacinia augue porta sed. Nullam mi felis, porttitor a metus quis, hendrerit ultricies ante. Nulla sagittis consequat mi, vitae lobortis dui dapibus in. In pretium laoreet nisi. Nullam sed lectus pulvinar, interdum libero sed, varius quam. Quisque feugiat nec nulla ut maximus. Morbi porttitor urna sit amet purus pulvinar ultricies. Nullam vitae magna ultrices, vulputate ante ut, lobortis nunc. Sed dolor erat, iaculis vitae tellus eget, vulputate eleifend quam.</p>
+            </article>
+        </section>
+
+        <section class='dashboard__bottom'>
+            <div class='shortcut-panel' aria-label='Raccourcis des rôles'>
+                <button type='button' class='personna-selected'>
+                    <img src='img/personna.svg' alt=''>
+                    <span>Prêtre</span>
+                </button>
+                <button type='button' class='personna'>
+                    <img src='img/personna.svg' alt=''>
+                    <span>Enseignant</span>
+                </button>
+                <button type='button' class='personna'>
+                    <img src='img/personna.svg' alt=''>
+                    <span>Parent</span>
+                </button>
+                <button type='button' class='personna'>
+                    <img src='img/personna.svg' alt=''>
+                    <span>Coach</span>
+                </button>
+                <button type='button' class='personna'>
+                    <img src='img/personna.svg' alt=''>
+                    <span>Dresseur</span>
+                </button>
+            </div>
+            <nav class='model-panel' aria-label='Choisir une IA'>
+                <button class='model-button is-selected' type='button' data-model='Gemini'>
+                    <img src='img/gemini.png' alt=''>
+                    <span>Gemini</span>
+                </button>
+                <button class='model-button' type='button' data-model='Claude'>
+                    <img src='img/claude.png' alt=''>
+                    <span>Claude</span>
+                </button>
+                <button class='model-button' type='button' data-model='Mistral'>
+                    <img src='img/mistral.png' alt=''>
+                    <span>Mistral</span>
+                </button>
+                <button class='model-button' type='button' data-model='GPT'>
+                    <img src='img/model-gpt.png' alt=''>
+                    <span>GPT</span>
+                </button>
+            </nav>
+        </section>
+    </main>
+    <script>
+        document.querySelectorAll('.model-button').forEach((button) => {
+            button.addEventListener('click', () => {
+                document.querySelector('.model-button.is-selected')?.classList.remove('is-selected');
+                button.classList.add('is-selected');
+            });
+        });
+    </script>
 </body>
 </html>
