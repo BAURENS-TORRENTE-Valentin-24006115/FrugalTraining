@@ -1,21 +1,48 @@
 """
 MAIA Beacon Setup Module
-Clones/updates MAIA Beacon repository, installs Python dependencies,
-and generates the .env configuration file for the beacon.
+Clones/updates MAIA Beacon repository, creates a Python Virtual Environment (.venv),
+installs dependencies inside the venv, and generates the .env configuration file.
 """
 
+import os
+import platform
 import sys
 from pathlib import Path
 from configs import load_config, ROOT_DIR
 from llama_setup import ensure_git_repo, run_cmd
 
 
-def ensure_beacon_deps(beacon_dir):
-    """Install Python requirements for MAIA-Beacon."""
+def get_or_create_venv(config):
+    """Ensure a Python Virtual Environment (.venv) exists and return its python executable path."""
+    venv_dir = (ROOT_DIR / config.get("venv_dir", "ai-server/.venv")).resolve()
+    
+    if platform.system() == "Windows":
+        python_exe = venv_dir / "Scripts" / "python.exe"
+    else:
+        python_exe = venv_dir / "bin" / "python"
+
+    if not python_exe.exists():
+        print(f"[+] Creating Python Virtual Environment (.venv) in {venv_dir}...")
+        venv_dir.mkdir(parents=True, exist_ok=True)
+        run_cmd([sys.executable, "-m", "venv", str(venv_dir)])
+        
+        print(f"[+] Upgrading pip inside virtual environment...")
+        run_cmd([str(python_exe), "-m", "pip", "install", "--upgrade", "pip"], check=False)
+    else:
+        print(f"[+] Using existing Virtual Environment: {venv_dir}")
+
+    return python_exe
+
+
+def ensure_beacon_deps(beacon_dir, venv_python):
+    """Install Python requirements for MAIA-Beacon inside the virtual environment."""
     req_file = Path(beacon_dir) / "requirements.txt"
     if req_file.exists():
-        print(f"[+] Installing MAIA-Beacon dependencies from {req_file}...")
-        run_cmd([sys.executable, "-m", "pip", "install", "-r", str(req_file)])
+        print(f"[+] Installing MAIA-Beacon dependencies inside .venv from {req_file}...")
+        run_cmd([str(venv_python), "-m", "pip", "install", "-r", str(req_file)])
+
+
+from install import check_tool, is_admin
 
 
 def configure_beacon_env(beacon_dir, llama_exe, config):
@@ -23,6 +50,10 @@ def configure_beacon_env(beacon_dir, llama_exe, config):
     beacon_path = Path(beacon_dir).resolve()
     models_path = (ROOT_DIR / config["models_dir"]).resolve()
     models_path.mkdir(parents=True, exist_ok=True)
+
+    admin = is_admin()
+    load_mode = config.get("llama_load_mode", "mmap+mlock" if admin else "mmap")
+    print(f"[+] Status privilèges : {'Administrateur (LLAMA_LOAD_MODE=' + load_mode + ')' if admin else 'Utilisateur standard (LLAMA_LOAD_MODE=' + load_mode + ')'}")
 
     llama_exe_str = str(Path(llama_exe).resolve()) if llama_exe else ""
     env_file = beacon_path / ".env"
@@ -33,37 +64,45 @@ LLAMA_SERVER_EXE={llama_exe_str}
 MODELS_DIR={str(models_path)}
 TARGET_DEVICE=AUTO
 IDLE_TIMEOUT_SECONDS={config['idle_timeout_seconds']}
+LLAMA_LOAD_MODE={load_mode}
+LLAMA_ARG_N_PARALLEL=1
+LLAMA_ARG_FLASH_ATTN=on
 """
+
     with open(env_file, "w", encoding="utf-8") as f:
         f.write(env_content)
     print(f"[+] Generated MAIA-Beacon configuration file: {env_file}")
     return env_file
 
 
+
 def setup_maia(llama_exe_path=None):
     """
-    Setup MAIA Beacon repository, dependencies, and environment configuration.
-    Returns Path to MAIA-Beacon directory.
+    Setup MAIA Beacon repository, virtual environment, dependencies, and environment configuration.
+    Returns tuple (Path to MAIA-Beacon directory, Path to venv python executable).
     """
     config = load_config()
     deps_dir = ROOT_DIR / config["deps_dir"]
     beacon_dir = deps_dir / "MAIA-Beacon"
 
-    # Ensure Git repository cloned at configured tag
+    # Ensure Git repository cloned or downloaded via ZIP
     ensure_git_repo(
         repo_url=config["beacon_repo"],
         target_dir=beacon_dir,
         tag=config.get("beacon_tag", "v1.0.0")
     )
 
-    # Install Python dependencies
-    ensure_beacon_deps(beacon_dir)
+    # Create or retrieve virtual environment
+    venv_python = get_or_create_venv(config)
+
+    # Install Python dependencies inside venv
+    ensure_beacon_deps(beacon_dir, venv_python)
 
     # Write .env configuration file
     configure_beacon_env(beacon_dir, llama_exe_path, config)
 
     print(f"[OK] MAIA Beacon setup completed: {beacon_dir}")
-    return beacon_dir
+    return beacon_dir, venv_python
 
 
 if __name__ == "__main__":
