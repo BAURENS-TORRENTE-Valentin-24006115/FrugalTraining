@@ -89,7 +89,7 @@ async def synthesize_sentence(sentence, voice, index, queue):
     assert type(queue) ==  asyncio.Queue, f"queue must be an asyncio.Queue and is {type(queue)}"
 
     filename = f"temp_audio_{index}.mp3"
-    communicate = edge_tts.Communicate(sentence, voice, rate="+15%", volume="+0%", pitch="+0Hz")
+    communicate = edge_tts.Communicate(sentence, voice, rate="+5%", volume="+0%", pitch="+0Hz")
     await communicate.save(filename)
 
     await queue.put((index, filename))
@@ -98,6 +98,12 @@ async def llm_stream_to_speech(stream, voice):
     """
     Read the llm stream out loud and print out the text in real time.
     In: stream (async generator)
+        voice   (string)
+    French voices available:
+    fr-BE-CharlineNeural, fr-BE-GerardNeural, fr-CA-AntoineNeural, fr-CA-JeanNeural,
+    fr-CA-SylvieNeural, fr-CA-ThierryNeural, fr-CH-ArianeNeural, fr-CH-FabriceNeural,
+    fr-FR-DeniseNeural, fr-FR-EloiseNeural, fr-FR-HenriNeural, fr-FR-RemyMultilingualNeural,
+    fr-FR-VivienneMultilingualNeural
     """
     pygame.mixer.init()
     audio_queue = asyncio.Queue()
