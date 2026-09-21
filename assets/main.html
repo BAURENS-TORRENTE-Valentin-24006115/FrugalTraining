@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang='fr'>
+<head>
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device-width, initial-scale=1'>
+    <title>IA Frugal</title>
+    <link rel='stylesheet' href='css/main.css'>
+</head>
+<body>
+    <main class='dashboard'>
+        <section class='top-panel'>
+            <aside class='score-panel'>
+                <div class='user-icon' aria-hidden='true'><span></span></div>
+                <h1>Role: Prêtre</h1>
+                <p class='score-summary'>Moyenne du score<br>de l'IA actuelle:<br><strong>24/100</strong></p>
+                <h2>Tableaux des<br>scores</h2>
+                <div class='chart' aria-label='Score comparatif des modèles'>
+                    <div class='chart-scale'><span>100</span><span>80</span><span>60</span><span>40</span><span>20</span><span>0</span></div>
+                    <div class='chart-grid'><i style='height: 88%'></i><i style='height: 66%'></i><i style='height: 48%'></i><i style='height: 24%'></i></div>
+                    <div class='chart-labels'><span>GPT</span><span>Gemini</span><span>Mistral</span><span>Deepseek</span></div>
+                </div>
+            </aside>
+            <article class='response-panel'>
+                <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce at lectus sollicitudin, vestibulum nisi eu, pellentesque odio. In ac lacinia nisi. Interdum et malesuada fames ac ante ipsum primis in faucibus. Lorem ipsum dolor sit amet, consectetur adipiscing elit. Vestibulum sed ipsum laoreet nibh eleifend convallis. In id sollicitudin est. Quisque non accumsan sem. Pellentesque in laoreet purus. Maecenas quis sapien nec nisl vehicula ultrices ut sodales orci.</p>
+                <p>Nunc eget dolor sit amet dolor interdum sollicitudin nec nec ex. Orci varius natoque penatibus et magnis dis parturient montes, nascetur ridiculus mus. Integer at leo et risus tempus tincidunt. In tincidunt elit risus, sed condimentum sem malesuada eu. Interdum et malesuada fames ac ante ipsum primis in faucibus. Duis aliquam felis ex, id blandit nulla elementum pharetra. Donec ultrices nisi vitae magna sagittis, ac ultricies mi blandit. Vivamus massa lorem, viverra eu varius vel, volutpat at sem. Suspendisse potenti. Mauris tristique lectus tristique magna bibendum faucibus. Donec ornare luctus libero non pharetra. Sed magna sapien, venenatis at tortor a, euismod convallis ligula. Suspendisse potenti. Maecenas dictum sit amet odio eu elementum.</p>
+                <p>Nullam et risus ipsum. Mauris tristique ligula tellus, at lacinia augue porta sed. Nullam mi felis, porttitor a metus quis, hendrerit ultricies ante. Nulla sagittis consequat mi, vitae lobortis dui dapibus in. In pretium laoreet nisi. Nullam sed lectus pulvinar, interdum libero sed, varius quam. Quisque feugiat nec nulla ut maximus. Morbi porttitor urna sit amet purus pulvinar ultricies. Nullam vitae magna ultrices, vulputate ante ut, lobortis nunc. Sed dolor erat, iaculis vitae tellus eget, vulputate eleifend quam.</p>
+            </article>
+        </section>
+        <section class='bottom-panel'>
+            <aside class='score-panel'>
+                <button class='input-button' type='button'>
+                    <img src='img/personna.svg' alt=''>
+                    <span>Prêtre</span>
+                </button>
+                <button class='input-button' type='button'>
+                    <img src='img/personna.svg' alt=''>
+                    <span>Enseigant</span>
+                </button>
+                <button class='input-button' type='button'>
+                    <img src='img/personna.svg' alt=''>
+                    <span>Parent</span>
+                </button>
+                <button class='input-button' type='button'>
+                    <img src='img/personna.svg' alt=''>
+                    <span>Coach</span>
+                </button>
+                <button class='input-button' type='button'>
+                    <img src='img/personna.svg' alt=''>
+                    <span>Dresseur</span>
+                </button>
+            </aside>
+            <article class='model-list'>
+                <button class='model-button is-selected' type='button'>
+                    <img src='img/gemini.png' alt=''>
+                    <span>Gemini</span>
+                </button>
+                <button class='model-button' type='button'>
+                    <img src='img/claude.png' alt=''>
+                    <span>Claude</span>
+                </button>
+                <button class='model-button' type='button'>
+                    <img src='img/mistral.png' alt=''>
+                    <span>Mistral</span>
+                </button>
+            </article>
+        </section>
+    </main>
+    <script src='js/main.js'></script>
+</body>
+</html>

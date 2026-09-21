@@ -21,3 +21,6 @@ ENV/
 build/
 dist/
 *.log
+.vscode
+.env
+.venv

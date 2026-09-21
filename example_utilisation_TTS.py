@@ -43,10 +43,10 @@ async def main():
     print(f"Utilisateur: {prompt}\n")
     
     # On crée le flux Gemini
-    stream = gemini_llm_stream(prompt, "fr-CA-AntoineNeural")
-    
-    # On passe ce flux à votre script EdgeTTS.py
-    await EdgeTTS.llm_stream_to_speech(stream)
+    stream = gemini_llm_stream(prompt)
+
+    # On passe ce flux à votre script TTS.py
+    await TTS.llm_stream_to_speech(stream, "fr-CA-AntoineNeural")
 
 if __name__ == "__main__":
     asyncio.run(main())
