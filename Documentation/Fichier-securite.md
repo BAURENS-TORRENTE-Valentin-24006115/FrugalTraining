@@ -159,3 +159,41 @@ Et comme il y a deux enceintes, une IA détournée ne se contente pas d'afficher
 | Le score affiché ne correspond pas à la réponse donnée | Score non vérifié avant affichage | Moyenne |
 
 La panne n'est pas une attaque, mais son effet est identique : l'œuvre ne fonctionne plus. Pendant une exposition, elle est plus probable qu'une intrusion. C'est le risque qui justifie les sauvegardes.
+
+# 3\. Le NUC et son pare-feu : ce qui existe déjà
+
+Le NUC constitue le cœur physique et logique de l’installation Frugal Training. Étant déployé sur le lieu d'exposition, il héberge à la fois le système d'exploitation, l'environnement d'exécution de l'IA locale, les deux bases de données et l'interface utilisateur.
+
+## 3.1 État des lieux du système d'exploitation et des services
+
+Avant toute modification, le NUC dispose d'une configuration par défaut qu'il convient de durcir :
+
+-   **Système d'exploitation :** Un système Linux (ex: Ubuntu Server / Debian) est à privilégier par rapport à Windows pour limiter la surface d'attaque, la consommation de ressources matérielles et les flux télémétriques incontrôlés.
+    
+-   **Services résidents :** Par défaut, plusieurs services réseau (SSH, mDNS/Avahi, clients de mise à jour automatique) peuvent être actifs et écouter sur les interfaces réseau.
+    
+-   **Comptes et privilèges :** Présence d'un compte utilisateur principal ayant potentiellement des droits `sudo` sans restriction, représentant un risque en cas de prise de contrôle locale.
+    
+
+## 3.2 Filtrage local (Pare-feu hôte)
+
+Le pare-feu local du NUC (`nftables` ou `ufw`) constitue la première ligne de défense interne. Sa politique par défaut doit être strictement définie selon le principe du moindre privilège : **Tout bloquer par défaut, autoriser uniquement le strict nécessaire.**
+
+### Règles de filtrage entrant
+
+-   **Trafic local/boucle locale :** Autorisé sans restriction (nécessaire pour la communication entre l'interface graphique, l'IA locale et les bases de données hébergées sur le même NUC).
+    
+-   **Flux de gestion (SSH) :** Bloqué par défaut sur l'interface publique. Il ne doit être autorisé que depuis une plage d'IP d'administration dédiée ou temporairement via une interface physique spécifique lors des phases de maintenance.
+    
+-   **Flux applicatifs :** Aucun port entrant n'a besoin d'être exposé au réseau du lieu d'exposition si l'IHM tourne localement sur le NUC.
+    
+
+### Règles de filtrage sortant
+
+-   **APIs d'IA publiques :** Autoriser uniquement le trafic HTTPS (port TCP 443) à destination des noms de domaine ou blocs IP strictement identifiés des fournisseurs d'IA (ex: API Mistral, OpenAI, Google Gemini).
+    
+-   **Résolution DNS :** Autoriser le port UDP/TCP 53 uniquement vers les serveurs DNS de confiance configurés.
+    
+-   **NTP (Synchronisation horaire) :** Autoriser le port UDP 123 pour garantir l'horodatage correct des logs d'erreurs et de sécurité.
+    
+-   **Tout autre flux sortant :** Bloqué (interdiction de la télémétrie OS, des mises à jour non planifiées en plein festival et des connexions vers des domaines tiers).
