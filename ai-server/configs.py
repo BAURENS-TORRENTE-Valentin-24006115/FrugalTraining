@@ -90,3 +90,49 @@ def load_config():
             print(f"[!] Warning: Failed to parse {CONFIG_FILE}, using defaults. Error: {e}")
     return config
 
+
+class _TeeStream:
+    def __init__(self, stream, file_obj):
+        self.stream = stream
+        self.file_obj = file_obj
+
+    def write(self, data):
+        self.stream.write(data)
+        try:
+            self.file_obj.write(data)
+            self.file_obj.flush()
+        except Exception:
+            pass
+
+    def flush(self):
+        self.stream.flush()
+        try:
+            self.file_obj.flush()
+        except Exception:
+            pass
+
+    def reconfigure(self, **kwargs):
+        if hasattr(self.stream, "reconfigure"):
+            self.stream.reconfigure(**kwargs)
+
+    def isatty(self):
+        return getattr(self.stream, "isatty", lambda: False)()
+
+
+def init_file_logger(script_name: str = "ai-server.log"):
+    """Initialize logging by redirecting stdout and stderr to a log file in ai-server/logs while maintaining console output."""
+    import sys
+    try:
+        log_dir = SCRIPT_DIR / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file_name = Path(script_name).stem + ".log"
+        log_file_path = log_dir / log_file_name
+        log_file = open(log_file_path, "a", encoding="utf-8", errors="replace")
+        
+        if not isinstance(sys.stdout, _TeeStream):
+            sys.stdout = _TeeStream(sys.stdout, log_file)
+        if not isinstance(sys.stderr, _TeeStream):
+            sys.stderr = _TeeStream(sys.stderr, log_file)
+    except Exception:
+        pass
+

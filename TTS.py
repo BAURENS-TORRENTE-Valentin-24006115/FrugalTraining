@@ -1,8 +1,26 @@
 import os
+import sys
 import asyncio
 import edge_tts
 import pygame
 import re
+
+
+async def _spinner_worker(stop_event: asyncio.Event, message: str = "Ministral analyse les réponses..."):
+    """Displays a rotating spinner while waiting for model generation to start."""
+    spinner_chars = ["|", "/", "-", "\\"]
+    idx = 0
+    while not stop_event.is_set():
+        char = spinner_chars[idx % len(spinner_chars)]
+        sys.stdout.write(f"\r[+] {message} {char} ")
+        sys.stdout.flush()
+        idx += 1
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=0.1)
+        except asyncio.TimeoutError:
+            pass
+    sys.stdout.write("\r" + " " * (len(message) + 12) + "\r")
+    sys.stdout.flush()
 
 async def mock_llm_stream():
     """
@@ -114,24 +132,47 @@ async def llm_stream_to_speech(stream, voice):
     sentence_buffer = ""
     sentence_index = 0
     
-    print("AI: ", end="", flush=True)
+    stop_spinner = asyncio.Event()
+    spinner_task = asyncio.create_task(_spinner_worker(stop_spinner, "Ministral analyse les réponses..."))
+    first_token_received = False
     
-    async for token in stream:
-        print(token, end="", flush=True)
-        sentence_buffer += token
-        
-        if re.search(r'[.!?]\s*$', sentence_buffer):
-            clean_sentence = sentence_buffer.strip()
+    try:
+        async for token in stream:
+            if not first_token_received:
+                first_token_received = True
+                stop_spinner.set()
+                await spinner_task
+                print("AI: ", end="", flush=True)
+
+            print(token, end="", flush=True)
+            sentence_buffer += token
             
-            # Ensure the string has playable characters to prevent crashes
-            if re.search(r'[a-zA-Z0-9À-ÿ]', clean_sentence):
-                task = asyncio.create_task(
-                    synthesize_sentence(clean_sentence, voice, sentence_index, audio_queue)
-                )
-                synthesis_tasks.append(task)
-                sentence_index += 1
+            if re.search(r'[.!?\n]\s*$', sentence_buffer):
+                clean_sentence = re.sub(r'[*#_~`]', '', sentence_buffer).strip()
                 
-            sentence_buffer = ""
+                # Ensure the string has playable characters to prevent crashes
+                if re.search(r'[a-zA-Z0-9À-ÿ]', clean_sentence):
+                    task = asyncio.create_task(
+                        synthesize_sentence(clean_sentence, voice, sentence_index, audio_queue)
+                    )
+                    synthesis_tasks.append(task)
+                    sentence_index += 1
+                    
+                sentence_buffer = ""
+    finally:
+        if not stop_spinner.is_set():
+            stop_spinner.set()
+            await spinner_task
+
+    # Process any remaining text in the buffer after stream completes
+    if sentence_buffer.strip():
+        clean_sentence = re.sub(r'[*#_~`]', '', sentence_buffer).strip()
+        if re.search(r'[a-zA-Z0-9À-ÿ]', clean_sentence):
+            task = asyncio.create_task(
+                synthesize_sentence(clean_sentence, voice, sentence_index, audio_queue)
+            )
+            synthesis_tasks.append(task)
+            sentence_index += 1
 
     if synthesis_tasks:
         await asyncio.gather(*synthesis_tasks)
@@ -143,5 +184,25 @@ async def llm_stream_to_speech(stream, voice):
     
     print("\n[Finished]")
 
+async def speak_static_text(text: str, voice: str = "fr-FR-DeniseNeural"):
+    """
+    Pronounce a static text string out loud using edge-tts and pygame.
+    """
+    if not text.strip():
+        return
+    pygame.mixer.init()
+    filename = "temp_static_audio.mp3"
+    communicate = edge_tts.Communicate(text, voice, rate="+5%", volume="+0%", pitch="+0Hz")
+    await communicate.save(filename)
+    pygame.mixer.music.load(filename)
+    pygame.mixer.music.play()
+    while pygame.mixer.music.get_busy():
+        await asyncio.sleep(0.05)
+    pygame.mixer.music.unload()
+    try:
+        os.remove(filename)
+    except OSError:
+        pass
+
 if __name__ == "__main__":
-    asyncio.run(llm_stream_to_speech(mock_llm_stream(), "fr-CA-AntoineNeural"))
+    asyncio.run(llm_stream_to_speech(mock_llm_stream(), "fr-CA-AntoineNeural"))
