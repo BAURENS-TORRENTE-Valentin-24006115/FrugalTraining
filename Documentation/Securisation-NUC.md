@@ -48,15 +48,13 @@ Réglage fait dans Windows Defender Firewall Properties → Logging → Customiz
 
 Avant de bloquer quoi que ce soit, on a regardé ce qui sortait déjà de la machine, et quel programme en était responsable :
 
-\# Connexions ouvertes : destination, port, numéro du programme
-
+```powershell
+# Connexions ouvertes : destination, port, numéro du programme
 Get-NetTCPConnection -State Established | Select-Object RemoteAddress, RemotePort, OwningProcess
-
-  
-
-\# Nom du programme qui correspond à chaque numéro
-
+ 
+# Nom du programme qui correspond à chaque numéro
 Get-Process | Select-Object Id, ProcessName, Path
+```
 
   
 
@@ -73,7 +71,9 @@ Toutes passent par le port 443, celui du HTTPS (trafic web chiffré). L'applicat
 
 Cet inventaire ne montre que les connexions ouvertes à un instant donné. Pour voir tout ce que la machine essaie d'envoyer sur une durée, on a bloqué tout le trafic sortant :
 
+```powershell
 Set-NetFirewallProfile -Profile Domain,Public,Private -DefaultOutboundAction Block
+```
 
   
 
@@ -111,7 +111,19 @@ Le fichier journal est gardé comme preuve.
 
 ### Remise en état
 
+```powershell
 Set-NetFirewallProfile -Profile Domain,Public,Private -DefaultOutboundAction Allow
+```
 
 
 Le blocage empêche aussi le groupe d'utiliser Internet sur la machine. Il a donc été retiré, et sera réactivé quand les règles de l'application seront écrites.
+
+## 2\. Verrouillage du démarrage
+ 
+### BIOS et UEFI
+ 
+Le pare-feu protège Windows, mais seulement quand c'est Windows qui tourne. Tout dépend donc de ce qui se passe avant, au démarrage.
+ 
+Quand on allume la machine, un programme stocké sur la carte mère vérifie le matériel puis lance le système. Ce programme s'appelait autrefois le BIOS. Il a été remplacé par l'UEFI, plus récent, mais le mot « BIOS » est resté dans l'usage courant, et Intel appelle même le sien « Visual BIOS ». Sur le NUC, c'est bien un UEFI.
+ 
+C'est l'UEFI qui choisit quel système démarrer. Si quelqu'un démarre la machine sur une clé USB avec un autre système, Windows ne tourne pas, nos réglages ne s'appliquent pas, et le disque est lisible par n'importe qui. C'est ce qui a été corrigé pendant cette séance. On accède à l'UEFI avec F2 au démarrage.
