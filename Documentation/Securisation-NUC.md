@@ -183,3 +183,11 @@ Ubuntu est conservé. Mais n'importe qui peut redémarrer et le choisir, et sur 
 - **Avast contourne le blocage.** Quand le port 443 est fermé, il essaie un autre port (7500). Il faut donc bloquer par défaut tous les ports, pas seulement le 443.
 - **Les règles ne peuvent pas encore être écrites.** Il faut connaître le programme exact de l'application pour l'autoriser, et elle n'est pas installée.
 - **Activer Secure Boot sans casser Ubuntu.** Il y avait un risque qu'Ubuntu ne démarre plus. Le mot de passe UEFI a été mis seulement après avoir vérifié que les deux systèmes démarraient, pour pouvoir revenir en arrière si besoin.
+
+## À faire
+ 
+- Tester l'accès à l'UEFI depuis GRUB et le démarrage sur une clé USB.
+- Mettre Windows Boot Manager en premier dans l'ordre de démarrage, pour que le menu GRUB ne s'affiche plus devant le public.
+- Écrire le script PowerShell du pare-feu.
+- Refaire l'inventaire une fois l'application installée, puis autoriser son programme et Avast.
+- Refaire la mesure avec Firefox fermé.
