@@ -127,3 +127,33 @@ Le pare-feu protège Windows, mais seulement quand c'est Windows qui tourne. Tou
 Quand on allume la machine, un programme stocké sur la carte mère vérifie le matériel puis lance le système. Ce programme s'appelait autrefois le BIOS. Il a été remplacé par l'UEFI, plus récent, mais le mot « BIOS » est resté dans l'usage courant, et Intel appelle même le sien « Visual BIOS ». Sur le NUC, c'est bien un UEFI.
  
 C'est l'UEFI qui choisit quel système démarrer. Si quelqu'un démarre la machine sur une clé USB avec un autre système, Windows ne tourne pas, nos réglages ne s'appliquent pas, et le disque est lisible par n'importe qui. C'est ce qui a été corrigé pendant cette séance. On accède à l'UEFI avec F2 au démarrage.
+
+### Réglages modifiés
+ 
+| Réglage | Avant | Après |
+| --- | --- | --- |
+| Boot USB Devices First | Activé | Désactivé |
+| USB | Activé | Désactivé |
+| Thunderbolt Boot | Activé | Désactivé |
+| Network Boot | Désactivé | Désactivé |
+| Secure Boot | Désactivé | Activé |
+ 
+Les trois premiers réglages ferment les portes par lesquelles on pouvait démarrer un autre système :
+ 
+- **Boot USB Devices First** faisait démarrer la machine en priorité sur n'importe quelle clé USB branchée.
+- **USB** autorisait le démarrage depuis un support USB.
+- **Thunderbolt** est un port USB-C rapide du NUC. La machine pouvait aussi démarrer sur un disque branché dessus.
+Le dernier, **Secure Boot**, agit différemment : au lieu de fermer une porte, il vérifie ce qui démarre, et refuse un système qui n'est pas signé par un éditeur reconnu.
+ 
+Les deux approches se complètent. Secure Boot seul ne suffit pas, car une clé Ubuntu officielle est signée et serait acceptée. C'est la désactivation de l'USB qui bloque vraiment le démarrage sur clé.
+ 
+### Mot de passe UEFI
+ 
+Ces réglages ne servent à rien si n'importe qui peut les annuler. Sans mot de passe, il suffit d'appuyer sur F2 pour réactiver le démarrage USB. Un mot de passe superviseur a donc été mis en place.
+ 
+| Mot de passe | Ce qu'il protège | Choix |
+| --- | --- | --- |
+| Supervisor Password | L'accès aux réglages de l'UEFI | Mis en place |
+| User Password | Le démarrage de la machine | Non utilisé |
+ 
+Le mot de passe superviseur n'est demandé que pour entrer dans les réglages. La machine, elle, démarre seule, ce qui lui permet de repartir après une coupure de courant. Le mot de passe utilisateur aurait été demandé à chaque allumage, d'où le choix de ne pas l'utiliser.
