@@ -157,3 +157,20 @@ Ces réglages ne servent à rien si n'importe qui peut les annuler. Sans mot de 
 | User Password | Le démarrage de la machine | Non utilisé |
  
 Le mot de passe superviseur n'est demandé que pour entrer dans les réglages. La machine, elle, démarre seule, ce qui lui permet de repartir après une coupure de courant. Le mot de passe utilisateur aurait été demandé à chaque allumage, d'où le choix de ne pas l'utiliser.
+
+### Windows et Ubuntu
+ 
+Il reste une porte que ces réglages ne ferment pas. La machine a deux systèmes, et au démarrage, c'est le menu d'Ubuntu (GRUB) qui s'affiche : il propose Ubuntu, Windows Boot Manager et UEFI Firmware Settings.
+ 
+Ubuntu est conservé. Mais n'importe qui peut redémarrer et le choisir, et sur Ubuntu aucune protection Windows ne s'applique : le disque Windows est accessible. Ce point n'est pas réglé.
+ 
+## Vérifications
+ 
+| Test | Résultat |
+| --- | --- |
+| Windows démarre avec Secure Boot | Oui |
+| `Confirm-SecureBootUEFI` | Passé de `False` à `True` |
+| Ubuntu démarre avec Secure Boot | Oui |
+| Accès à l'UEFI par F2 | Mot de passe demandé |
+| Accès à l'UEFI depuis le menu GRUB | À tester |
+| Démarrage sur une clé USB | À tester |
