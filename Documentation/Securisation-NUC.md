@@ -174,3 +174,12 @@ Ubuntu est conservé. Mais n'importe qui peut redémarrer et le choisir, et sur 
 | Accès à l'UEFI par F2 | Mot de passe demandé |
 | Accès à l'UEFI depuis le menu GRUB | À tester |
 | Démarrage sur une clé USB | À tester |
+
+## Difficultés rencontrées
+ 
+- **Identifier les destinations.** `Resolve-DnsName` ne donne pas de réponse pour beaucoup d'adresses (72.145.35.144, 98.66.133.186…). Il a fallu passer par le propriétaire du bloc d'adresses pour savoir à qui elles appartiennent.
+- **Mesure faussée par Firefox.** Le navigateur était ouvert pendant le test. On ne peut pas séparer ce qui vient de la navigation de ce qui vient du système : la mesure est à refaire.
+- **Le pare-feu Windows ne filtre pas par nom de domaine.** On ne peut pas écrire « autoriser api.mistral.ai », seulement un programme, un port ou une adresse IP. Or les services en ligne changent souvent d'adresses. Les règles devront donc être faites par programme.
+- **Avast contourne le blocage.** Quand le port 443 est fermé, il essaie un autre port (7500). Il faut donc bloquer par défaut tous les ports, pas seulement le 443.
+- **Les règles ne peuvent pas encore être écrites.** Il faut connaître le programme exact de l'application pour l'autoriser, et elle n'est pas installée.
+- **Activer Secure Boot sans casser Ubuntu.** Il y avait un risque qu'Ubuntu ne démarre plus. Le mot de passe UEFI a été mis seulement après avoir vérifié que les deux systèmes démarraient, pour pouvoir revenir en arrière si besoin.
