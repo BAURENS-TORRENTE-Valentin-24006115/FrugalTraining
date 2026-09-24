@@ -6,6 +6,9 @@ ai-server/models/
 
 # Orchestrator & Beacon runtime state / config overrides
 ai-server/state.json
+ai-server/*.lock
+ai-server/.venv*
+ai-server/.test-deps/
 ai-server/*.env
 ai-server/deps/MAIA-Beacon/.env
 
@@ -21,3 +24,5 @@ ENV/
 build/
 dist/
 *.log
+log.*
+ai-server/tests/

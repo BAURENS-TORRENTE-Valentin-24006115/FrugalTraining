@@ -1,264 +1,394 @@
-"""
-MAIA Beacon Main Bootstrapper & Controller
-Orchestrates hardware scanning, llama-cpp setup, MAIA Beacon configuration,
-and service lifecycle.
-"""
-
+"""Prepare, validate and supervise one local Beacon installation."""
 import argparse
-import subprocess
-import sys
-import time
-import urllib.error
-import urllib.request
+from contextlib import ExitStack
+import json
 import os
 from pathlib import Path
+import signal
+import socket
+import struct
+import subprocess
+import sys
+import tempfile
+import threading
+import time
+from typing import Any, Optional, Union
+import urllib.error
+import urllib.request
 
-# Force UTF-8 encoding for standard output and error streams on Windows
-if sys.platform == "win32":
+from configs import ROOT_DIR, SCRIPT_DIR, STATE_FILE, init_file_logger, load_config, print_effective_config
+from install import print_system_report, scan_hardware
+from llama_setup import setup_llama
+from maia_setup import managed_environment, setup_maia
+from setup_utils import atomic_json, digest, download, file_lock, read_json
+
+
+def reserve_port(host: str = "127.0.0.1", port: int = 0) -> socket.socket:
+    """Reserve a local port until the returned socket is closed."""
+    sock = socket.socket(socket.AF_INET6 if ":" in host else socket.AF_INET, socket.SOCK_STREAM)
     try:
-        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+        if os.name == "nt":
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        sock.bind((host, port))
+        return sock
     except Exception:
-        pass
-
-from configs import load_config, ROOT_DIR, safe_urlopen, init_file_logger
-from install import scan_hardware, print_system_report
-from llama_setup import setup_llama, run_cmd
-from maia_setup import setup_maia
-
-init_file_logger("beacon.py")
+        sock.close()
+        raise
 
 
-def start_beacon_service(beacon_dir, python_exe=None):
-    """Launch MAIA Beacon service as a background process and stream its output to stdout/logs."""
-    beacon_path = Path(beacon_dir).resolve()
-    main_py = beacon_path / "main.py"
-    if not main_py.exists():
-        print(f"[!] Error: {main_py} not found!")
-        return None
+def stop_process(process: subprocess.Popen) -> None:
+    """Stop this child process, forcing termination if it does not exit."""
+    if process.poll() is None:
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=10)
 
-    exe = str(python_exe) if python_exe else sys.executable
-    print(f"[+] Launching MAIA Beacon service ({main_py}) using {exe}...")
 
-    # Ensure subprocess runs in full UTF-8 unbuffered mode on Windows 10
-    env = os.environ.copy()
-    env["PYTHONUTF8"] = "1"
-    env["PYTHONIOENCODING"] = "utf-8"
-    env["PYTHONUNBUFFERED"] = "1"
-    env["LLAMA_ARG_N_PARALLEL"] = "1"
-    env["LLAMA_ARG_FLASH_ATTN"] = "on"
+def validate_model(path: Union[str, Path], expected_sha256: Optional[str] = None) -> str:
+    """Validate a GGUF model file header format and optional SHA-256 digest.
 
-    proc = subprocess.Popen(
-        [exe, "main.py"],
-        cwd=beacon_path,
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        bufsize=1,
+    Args:
+        path (str or Path): Path to the GGUF model file.
+        expected_sha256 (str, optional): Expected SHA-256 hash. Defaults to None.
+
+    Returns:
+        str: Hexadecimal SHA-256 digest string of the model.
+
+    Raises:
+        RuntimeError: If header is invalid/truncated or SHA-256 mismatch occurs.
+    """
+    with open(path, "rb") as stream:
+        header = stream.read(24)
+    if len(header) != 24:
+        raise RuntimeError(f"Truncated GGUF header: {path}")
+    magic, version, tensors, metadata = struct.unpack("<4sIQQ", header)
+    if magic != b"GGUF" or version not in (2, 3) or not tensors or not metadata:
+        raise RuntimeError(f"Invalid GGUF header: {path}")
+    sha256 = digest(path)
+    if expected_sha256 and sha256.lower() != expected_sha256.lower():
+        raise RuntimeError(f"Model SHA256 mismatch: {path}")
+    return sha256
+
+
+def ensure_model(config: dict[str, Any], offline: bool = False, update: bool = False) -> Path:
+    """Ensure the configured default GGUF model exists and is verified.
+
+    Args:
+        config (dict): Server configuration parameters.
+        offline (bool, optional): Prevent remote downloads if set. Defaults to False.
+        update (bool, optional): Force model re-download or update check. Defaults to False.
+
+    Returns:
+        Path: Verified local Path to the default GGUF model file.
+
+    Raises:
+        RuntimeError: If model is missing in offline mode or download fails.
+    """
+    root = (ROOT_DIR / config["models_dir"]).resolve()
+    root.mkdir(parents=True, exist_ok=True)
+    model = root / config["default_model_file"]
+    marker = model.with_suffix(".gguf.manifest.json")
+    identity_keys = ("default_model_repo", "default_model_file", "default_model_revision", "default_model_sha256")
+    identity = {k: config[k] for k in identity_keys}
+    stamp = read_json(marker)
+    if model.is_file() and not update:
+        if stamp.get("identity") == identity:
+            validate_model(model, config["default_model_sha256"] or stamp.get("sha256"))
+            return model
+        if not stamp:
+            sha256 = validate_model(model, config["default_model_sha256"])
+            print(f"[+] Adopting local GGUF {model.name}; full inference will be checked at launch")
+            atomic_json(marker, {"identity": identity, "sha256": sha256, "origin": "local"})
+            return model
+    if offline:
+        raise RuntimeError("Default model missing or its configured revision changed; run setup online")
+    url = (
+        f"https://huggingface.co/{config['default_model_repo']}/resolve/"
+        f"{config['default_model_revision']}/{config['default_model_file']}"
+    )
+    with tempfile.TemporaryDirectory(dir=root, prefix="model-") as temp:
+        staged = Path(temp) / model.name
+        print(f"[+] Downloading {model.name}")
+        download(url, staged, config["default_model_sha256"])
+        sha256 = validate_model(staged, config["default_model_sha256"])
+        if model.exists():
+            backup = model.with_name(model.name + ".previous-" + str(time.time_ns()))
+            model.rename(backup)
+            print(f"[+] Previous model preserved at {backup}")
+        staged.replace(model)
+        atomic_json(marker, {"identity": identity, "sha256": sha256, "origin": url})
+    return model
+
+
+def connect_host(host: str) -> str:
+    """Normalize wild-card host addresses for local HTTP connections.
+
+    Args:
+        host (str): IP host address string.
+
+    Returns:
+        str: Loopback address string ('127.0.0.1' or '::1') if host is wildcard, otherwise host.
+    """
+    return {"0.0.0.0": "127.0.0.1", "::": "::1"}.get(host, host)
+
+
+def service_url(config: dict[str, Any]) -> str:
+    """Construct the HTTP base URL string for the local Beacon service.
+
+    Args:
+        config (dict): Server configuration parameters dictionary.
+
+    Returns:
+        str: Service base URL string (e.g. 'http://127.0.0.1:11343').
+    """
+    host = connect_host(config["beacon_host"])
+    formatted_host = f"[{host}]" if ":" in host else host
+    return f"http://{formatted_host}:{config['beacon_port']}"
+
+
+def local_json(url: str, data: Optional[Any] = None, timeout: int = 5) -> Any:
+    """Execute a local HTTP request and return parsed JSON payload without using system proxy settings.
+
+    Args:
+        url (str): Target local HTTP URL.
+        data (dict or list, optional): JSON request body. Defaults to None.
+        timeout (int, optional): Request timeout in seconds. Defaults to 5.
+
+    Returns:
+        dict or list: Parsed JSON response.
+    """
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(data).encode() if data is not None else None,
+        headers={"Content-Type": "application/json"},
+    )
+    # Local service calls never go through a corporate/inherited HTTP proxy.
+    with urllib.request.build_opener(urllib.request.ProxyHandler({})).open(request, timeout=timeout) as response:
+        return json.load(response)
+
+
+def start_beacon_service(
+    beacon_dir: Union[str, Path],
+    python_exe: Union[str, Path],
+    config: dict[str, Any],
+    llama_exe: Union[str, Path],
+    llama_port: int,
+) -> subprocess.Popen:
+    """Launch MAIA-Beacon's own main.py with the prepared environment.
+
+    Args:
+        beacon_dir (str or Path): Path to the Beacon checkout directory.
+        python_exe (str or Path): Path to Python executable in the virtual environment.
+        config (dict): Server configuration object.
+        llama_exe (str or Path): Path to llama-server executable.
+        llama_port (int): Reserved port for llama-server.
+
+    Returns:
+        subprocess.Popen: Process handle of the launched service.
+    """
+    env = managed_environment(config, llama_exe, llama_port)
+    main_py = Path(beacon_dir).resolve() / "main.py"
+    if not main_py.is_file():
+        raise RuntimeError(f"Beacon entry point missing: {main_py}")
+    process = subprocess.Popen(
+        [str(python_exe), str(main_py)],
+        cwd=beacon_dir, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, encoding="utf-8", errors="replace", bufsize=1,
+        start_new_session=os.name != "nt",
+        creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
     )
 
-    import threading
-    def stream_beacon_output(process):
+    def output() -> None:
+        """Stream process output line by line to standard output."""
+        if process.stdout:
+            for line in process.stdout:
+                print(line.rstrip(), flush=True)
+
+    threading.Thread(target=output, daemon=True).start()
+    return process
+
+
+def wait_for_healthcheck(process: subprocess.Popen, config: dict[str, Any]) -> None:
+    """Wait for Beacon's API, select the configured context and verify inference.
+
+    Args:
+        process (subprocess.Popen): Subprocess instance of the Beacon service.
+        config (dict): Server configuration dictionary.
+
+    Raises:
+        RuntimeError: If process exits prematurely, health check times out, or smoke test fails.
+    """
+    deadline = time.monotonic() + config["startup_timeout_seconds"]
+    base = service_url(config)
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError(f"Beacon exited before startup: code {process.returncode}")
         try:
-            for line in iter(process.stdout.readline, ""):
-                if line:
-                    sys.stdout.write(line)
-                    sys.stdout.flush()
-        except Exception:
+            status = local_json(base + "/v1/models", timeout=2)
+            if isinstance(status.get("data"), list) and process.poll() is None:
+                break
+        except (OSError, ValueError):
             pass
-
-    threading.Thread(target=stream_beacon_output, args=(proc,), daemon=True).start()
-    return proc
-
-
-def is_service_ready(host, port):
-    """Check if MAIA Beacon service is already running and responsive."""
-    url = f"http://{host}:{port}/v1/models"
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "Beacon-Healthcheck"})
-        with safe_urlopen(req, timeout=2) as resp:
-            return resp.status == 200
-    except Exception:
-        return False
-
-
-def kill_process_on_port(port):
-    """Find and terminate any stale process listening on the specified TCP port (Windows)."""
-    try:
-        import platform
-        if platform.system() == "Windows":
-            res = subprocess.run(["netstat", "-ano"], capture_output=True, text=True, check=False)
-            for line in res.stdout.splitlines():
-                if f":{port}" in line and "LISTENING" in line:
-                    parts = line.strip().split()
-                    pid = parts[-1]
-                    if pid.isdigit() and int(pid) > 0:
-                        print(f"[+] Clearing stale process (PID {pid}) listening on port {port}...")
-                        subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True, check=False)
-                        time.sleep(1)
-    except Exception:
-        pass
-
-
-def wait_for_healthcheck(host, port, timeout_sec=60):
-    """Poll healthcheck endpoint until service is active."""
-    url = f"http://{host}:{port}/v1/models"
-    print(f"[+] Waiting for MAIA Beacon service healthcheck at {url}...")
-    start_time = time.time()
-    while time.time() - start_time < timeout_sec:
-        if is_service_ready(host, port):
-            print(f"\n[OK] MAIA Beacon is READY and accepting requests at http://{host}:{port}!")
-            return True
-        sys.stdout.write(".")
-        sys.stdout.flush()
-        time.sleep(1.5)
-
-    print(f"\n[!] Healthcheck timed out after {timeout_sec}s.")
-    return False
-
-
-def download_model_file(url, target_path):
-    """Download model file via HTTP with progress reporting."""
-    print(f"[+] Downloading model from: {url}")
-    temp_path = target_path.with_suffix(".tmp")
-    try:
-        req = urllib.request.Request(url, headers={"User-Agent": "MAIA-Beacon-Downloader/1.0"})
-        with safe_urlopen(req, timeout=300) as resp, open(temp_path, "wb") as out_file:
-
-            total_size = int(resp.headers.get("Content-Length", 0))
-            downloaded = 0
-            chunk_size = 1024 * 1024  # 1MB chunks
-            last_percent = -1
-
-            while True:
-                chunk = resp.read(chunk_size)
-                if not chunk:
-                    break
-                out_file.write(chunk)
-                downloaded += len(chunk)
-                if total_size > 0:
-                    percent = int((downloaded / total_size) * 100)
-                    if percent != last_percent and percent % 5 == 0:
-                        mb_dl = downloaded / (1024 * 1024)
-                        mb_total = total_size / (1024 * 1024)
-                        sys.stdout.write(f"\r    > Download progress: {percent}% ({mb_dl:.1f} MB / {mb_total:.1f} MB)")
-                        sys.stdout.flush()
-                        last_percent = percent
-            print()
-
-        temp_path.replace(target_path)
-        print(f"[OK] Model successfully downloaded to: {target_path}")
-        return True
-    except Exception as e:
-        if temp_path.exists():
-            try:
-                temp_path.unlink()
-            except Exception:
-                pass
-        print(f"[!] Model download failed: {e}")
-        return False
-
-
-def ensure_model(config):
-    """Download default GGUF LLM model if missing using Python HTTP download."""
-    models_dir = (ROOT_DIR / config["models_dir"]).resolve()
-    models_dir.mkdir(parents=True, exist_ok=True)
-    model_filename = config.get("default_model_file", "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf")
-    model_path = models_dir / model_filename
-
-    if not model_path.exists():
-        print(f"[+] Default LLM model missing ({model_filename}). Initiating download...")
-        repo = config.get("default_model_repo", "mistralai/Ministral-3-3B-Instruct-2512-GGUF")
-        
-        # HuggingFace direct resolve URL
-        hf_url = f"https://huggingface.co/{repo}/resolve/main/{model_filename}"
-        success = download_model_file(hf_url, model_path)
-        if not success:
-            print(f"[!] Warning: Could not download LLM model. Please place '{model_filename}' manually in {models_dir}")
+        time.sleep(0.25)
     else:
-        print(f"[+] LLM Model present: {model_path}")
+        raise RuntimeError("Beacon HTTP startup timed out")
+    model = Path(config["default_model_file"]).stem
+    local_json(base + "/api/select", {"model": model, "context_size": config["context_size"]})
+    deadline = time.monotonic() + config["startup_timeout_seconds"]
+    while time.monotonic() < deadline:
+        if process.poll() is not None:
+            raise RuntimeError(f"Beacon exited during model loading: code {process.returncode}")
+        status = local_json(base + "/api/status")
+        if status.get("status") == "error":
+            raise RuntimeError(status.get("error_message") or "Beacon model loading failed")
+        if status.get("status") == "running" and status.get("active_model") == model:
+            break
+        time.sleep(0.25)
+    else:
+        raise RuntimeError("Beacon model loading timed out")
+    # A catalog HTTP 200 is not a model/inference readiness check.
+    try:
+        response = local_json(base + "/v1/chat/completions", {
+            "model": model,
+            "messages": [{"role": "user", "content": "Hello"}],
+            "max_tokens": 1, "stream": False,
+        }, timeout=config["startup_timeout_seconds"] * 3 + 30)
+    except urllib.error.HTTPError as exc:
+        try:
+            status_detail = local_json(base + "/api/status", timeout=5)
+            detail = status_detail.get("error_message")
+        except (OSError, ValueError):
+            detail = None
+        raise RuntimeError(f"Inference smoke test failed (HTTP {exc.code}): {detail or exc.reason}") from exc
+    if not isinstance(response.get("choices"), list) or not response["choices"]:
+        raise RuntimeError("Inference smoke test returned no choices")
+    print(f"[OK] API and one-token inference validated at {base}")
 
 
+def shutdown(process: subprocess.Popen, config: dict[str, Any]) -> None:
+    """Gracefully stop the Beacon service process tree.
 
-def main():
-    parser = argparse.ArgumentParser(description="MAIA Beacon Main Bootstrapper & Controller")
-    parser.add_argument("--check-only", action="store_true", help="Only perform hardware scan and report status")
-    parser.add_argument("--no-launch", action="store_true", help="Perform setup without starting beacon server")
-    parser.add_argument("--force-rebuild", action="store_true", help="Force rebuilding or re-downloading llama-cpp binary")
-    args = parser.parse_args()
-
-    config = load_config()
-
-    print("=" * 60)
-    print("        MAIA Beacon Bootstrapper & Controller        ")
-    print("=" * 60)
-
-    # Hardware & Tool Scan
-    hw_report = scan_hardware()
-    print_system_report(hw_report)
-
-    if args.check_only:
-        print("[+] Check completed (--check-only).")
+    Args:
+        process (subprocess.Popen): Active process handle.
+        config (dict): Server configuration settings.
+    """
+    if process.poll() is not None:
         return
-
-    # Setup llama-cpp-turboquant (Download binary or CMake compilation fallback)
-    llama_exe = setup_llama(hw_report, force_rebuild=args.force_rebuild)
-
-    # Setup MAIA Beacon repo, virtual environment, dependencies, and .env
-    beacon_dir, venv_python = setup_maia(llama_exe_path=llama_exe)
-
-    if args.no_launch:
-        print("[+] Setup completed successfully (--no-launch).")
-        return
-
-    # Ensure LLM Model is available
-    ensure_model(config)
-
-    host = config.get("beacon_host", "127.0.0.1")
-    port = config.get("beacon_port", 11343)
-
-    if is_service_ready(host, port):
-        print(f"\n[OK] MAIA Beacon is ALREADY running and READY at http://{host}:{port}!")
-        return
-
-    # Clean up any stale process occupying the port
-    kill_process_on_port(port)
-
-    # Launch MAIA Beacon service inside the virtual environment
-    proc = start_beacon_service(beacon_dir, python_exe=venv_python)
-
-    if proc:
-        ready = wait_for_healthcheck(host, port)
-        if ready:
-            try:
-                ret = proc.wait()
-                if ret != 0:
-                    print(f"\n[!] MAIA Beacon process exited unexpectedly with code {ret} (hex: {hex(ret & 0xFFFFFFFF)})")
-            except KeyboardInterrupt:
-                print("\n[+] Stopping MAIA Beacon service...")
-                proc.terminate()
+    try:
+        local_json(service_url(config) + "/api/stop", {}, timeout=15)
+    except (OSError, ValueError):
+        pass
+    if os.name == "nt":
+        # Check our PID
+        result = subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"], capture_output=True, timeout=20)
+        if result.returncode and process.poll() is None:
+            stop_process(process)
         else:
-            print("\n[!] MAIA Beacon healthcheck failed. Terminating service...")
-            proc.terminate()
+            process.wait(timeout=20)
+    else:
+        try:
+            os.killpg(process.pid, signal.SIGTERM)
+            process.wait(timeout=15)
+        except ProcessLookupError:
+            pass
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait(timeout=10)
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    """Main CLI entry point for configuring, validating, and running Beacon.
+
+    Args:
+        argv (list of str, optional): Command line arguments. Defaults to None (sys.argv[1:]).
+
+    Returns:
+        int: Exit status code (0 for success).
+    """
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check-only", action="store_true", help="Report configuration and hardware only")
+    parser.add_argument(
+        "--no-launch", "--setup-only", action="store_true",
+        help="Prepare dependencies AND model, without starting the server",
+    )
+    parser.add_argument(
+        "--offline", "--start-only", action="store_true",
+        help="Use validated local artifacts only; no pip or downloads",
+    )
+    parser.add_argument("--update", action="store_true", help="Explicitly refresh configured source/binary/model versions")
+    parser.add_argument("--force-rebuild", action="store_true", help="Build llama from the configured source ref")
+    parser.add_argument("--verify-only", action="store_true", help="Start, run a real inference smoke test, then stop")
+    args = parser.parse_args(argv)
+    if args.offline and (args.update or args.force_rebuild):
+        parser.error("--offline cannot be combined with --update or --force-rebuild")
+    if args.no_launch and args.verify_only:
+        parser.error("--no-launch cannot be combined with --verify-only")
+    if sys.version_info < (3, 11):
+        raise RuntimeError("Python 3.11 or newer is required")
+    config = load_config()
+    print_effective_config(config)
+    hardware = scan_hardware()
+    print_system_report(hardware)
+    if args.check_only:
+        return 0
+    with ExitStack() as locks:
+        # Hold ownership for the whole server lifetime: setup cannot replace a live binary.
+        resources = {
+            SCRIPT_DIR / "setup.lock",
+            (ROOT_DIR / config["deps_dir"]) / ".frugal.lock",
+            (ROOT_DIR / config["models_dir"]) / ".frugal.lock",
+            (ROOT_DIR / config["venv_dir"]).with_suffix(".frugal.lock"),
+        }
+        for path in sorted(resources, key=lambda p: str(p.resolve())):
+            locks.enter_context(file_lock(path))
+        exe = setup_llama(hardware, args.force_rebuild, args.offline, args.update, config)
+        backend_state = read_json(STATE_FILE)
+        beacon_dir, python = setup_maia(exe, args.offline, args.update, config)
+        model_path = ensure_model(config, args.offline, args.update)
+        if args.no_launch:
+            print("[OK] Offline artifacts prepared. Use --offline --verify-only to validate inference.")
+            return 0
+        config["_actual_backend"] = backend_state["backend"]
+        beacon_socket = reserve_port(config["beacon_host"], config["beacon_port"])
+        llama_socket = None
+        try:
+            llama_socket = reserve_port(port=config["llama_port"] or 0)
+            llama_port = llama_socket.getsockname()[1]
+            print(f"[+] Instance ports: Beacon={config['beacon_port']}, llama={llama_port}")
+        finally:
+            beacon_socket.close()
+            if llama_socket:
+                llama_socket.close()
+        process = start_beacon_service(beacon_dir, python, config, exe, llama_port)
+        try:
+            try:
+                wait_for_healthcheck(process, config)
+            except RuntimeError as exc:
+                if "0xC000001D" in str(exc):
+                    state = read_json(STATE_FILE)
+                    if state.get("sha256") == digest(exe):
+                        state["runtime_failure"] = str(exc)
+                        atomic_json(STATE_FILE, state)
+                raise
+            if args.verify_only:
+                return 0
+            code = process.wait()
+            if code:
+                raise RuntimeError(f"Beacon exited unexpectedly: {code}")
+            return 0
+        finally:
+            shutdown(process, config)
 
 
 if __name__ == "__main__":
+    init_file_logger("beacon.py")
     try:
-        main()
+        sys.exit(main())
     except KeyboardInterrupt:
-        print("\n[+] Service arrété par l'utilisateur.")
-    except Exception as e:
-        import traceback
-        print("\n" + "!" * 60)
-        print("                 UNE ERREUR EST SURVENUE                  ")
-        print("!" * 60)
-        traceback.print_exc()
-        print("!" * 60)
-        try:
-            input("\nAppuyez sur Entrée pour fermer le terminal...")
-        except Exception:
-            pass
+        sys.exit(130)
+    except Exception as exc:
+        print(f"[ERROR] {exc}", file=sys.stderr)
         sys.exit(1)
