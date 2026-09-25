@@ -268,4 +268,33 @@ Ce n'est pas infaillible. Un périphérique peut se déclarer comme étant le cl
 Plusieurs logiciels de la machine ont leur propre page de réglages, qui s'ouvre dans un navigateur. Un mot de passe sur chacune évite qu'un visiteur sorti de l'œuvre puisse y toucher.
  
 Le réglage du bouton d'alimentation ne vaut que pour l'appui court. Maintenu quelques secondes, le bouton coupe le courant directement, sans passer par le système.
+
+## 5.4 Les mesures sur la machine elle-même
  
+Ces mesures sont matérielles. Elles restent valables quel que soit le système installé.
+ 
+| Mesure | Ce que ça empêche |
+| --- | --- |
+| Mot de passe sur l'UEFI | On ne change plus les réglages de démarrage |
+| Démarrage sur USB désactivé, ordre de démarrage figé | On ne contourne plus le système avec une clé |
+| Démarrage sécurisé (Secure Boot) activé | On ne démarre pas un système non signé |
+| Ports USB inutilisés bouchés (cache-ports) ou tournés vers le mur | On ne branche ni clé ni clavier |
+| NUC vissé au mur | La machine ne part pas sous un manteau |
+ 
+Les trois premières lignes sont les plus importantes de toute la partie. Sans mot de passe UEFI, tout le reste peut être contourné en trente secondes avec une clé USB.
+ 
+### Si quelqu'un ouvre le boîtier
+ 
+Le mot de passe de l'UEFI protège les réglages, pas la carte.
+ 
+Les NUC ont sur leur carte un cavalier de sécurité, prévu pour remettre le BIOS à zéro quand un mot de passe a été oublié. On retire le cavalier, on démarre, un menu propose d'effacer les mots de passe, on remet le cavalier en place. La machine repart sans protection.
+ 
+Il faut un tournevis, l'accès à la machine et quelques minutes. Rien de plus, et la procédure est publique.
+ 
+Devant le clavier, un visiteur essaie quelque chose en dix secondes. Ouvrir le boîtier suppose de venir avec un outil et de rester plusieurs minutes sur la machine. C'est beaucoup moins probable, mais ça annule toute la partie UEFI.
+ 
+Aucun réglage ne l'empêche. Deux choses limitent les dégâts.
+ 
+La première est de rendre l'ouverture difficile et visible. Vissé au mur, le NUC doit être démonté sur place. Une étiquette collée sur la jonction du boîtier, qui se déchire quand on l'ouvre, ne bloque personne mais permet de s'en apercevoir. Sans elle, l'ouverture ne laisse aucune trace.
+ 
+La seconde est le chiffrement du disque. Remettre le BIOS à zéro ne donne pas la clé du disque, et cette remise à zéro efface aussi les clés du TPM. Le disque ne se déverrouille alors plus tout seul, la clé de secours est demandée, et la machine ne démarre plus.
