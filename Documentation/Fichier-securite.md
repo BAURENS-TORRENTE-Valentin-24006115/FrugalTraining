@@ -226,3 +226,21 @@ Les touches changent d'un système à l'autre, les possibilités non.
 Le gestionnaire de tâches sert à fermer l'application ou à en lancer une autre. `Ctrl+Alt+Suppr` est un cas à part : le système le traite avant tout le reste, on ne peut pas le neutraliser comme un raccourci normal, et seul le mode kiosque limite ce qu'on y trouve.
  
 Il existe des dizaines d'autres raccourcis, sans compter le clic droit et les menus. Un seul qui reste actif suffit pour sortir de l'œuvre, donc les bloquer un par un ne marchera jamais. On verrouille plutôt la session sur une seule application, et tout ce qui n'était pas prévu est refusé. C'est la même logique que pour le pare-feu : on liste ce qui est autorisé, pas ce qui est interdit.
+
+## 5.2 Actions possibles sur la machine
+ 
+Cette partie ne dépend pas du système installé.
+ 
+| Ce qu'il fait | Ce qui se passe |
+| --- | --- |
+| Il branche une clé USB | Le contenu s'ouvre tout seul si l'ouverture automatique est activée |
+| Il branche un second clavier ou une souris | La machine ne fait aucune différence avec le clavier du mur |
+| Il redémarre sur une clé USB | Il contourne tout le système et tout ce qu'on a configuré |
+| Il appuie sur le bouton d'alimentation | La machine s'éteint en pleine session |
+| Il l'éteint et la rallume plusieurs fois | La base de données peut être abîmée si la machine s'éteint pendant qu'elle écrit |
+| Il débranche le réseau | L'IA en ligne ne répond plus |
+| Il ouvre le boîtier | Il peut retirer le disque et le lire ou le modifier ailleurs |
+| Il décroche la machine | Elle disparaît |
+ 
+Démarrer sur une clé USB est le pire cas. Ce n'est plus le même système qui démarre, donc le mode kiosque, les mots de passe et les comptes limités ne servent plus à rien. Les réglages de l'UEFI sont la mesure la plus importante de cette partie.
+ 
