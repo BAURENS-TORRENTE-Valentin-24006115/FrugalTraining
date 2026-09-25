@@ -29,3 +29,4 @@ dist/
 *.log
 log.*
 ai-server/tests/
+.vscode/mcp.json
