@@ -298,3 +298,31 @@ Aucun réglage ne l'empêche. Deux choses limitent les dégâts.
 La première est de rendre l'ouverture difficile et visible. Vissé au mur, le NUC doit être démonté sur place. Une étiquette collée sur la jonction du boîtier, qui se déchire quand on l'ouvre, ne bloque personne mais permet de s'en apercevoir. Sans elle, l'ouverture ne laisse aucune trace.
  
 La seconde est le chiffrement du disque. Remettre le BIOS à zéro ne donne pas la clé du disque, et cette remise à zéro efface aussi les clés du TPM. Le disque ne se déverrouille alors plus tout seul, la clé de secours est demandée, et la machine ne démarre plus.
+
+## 5.5 Vérification
+ 
+Une mesure configurée n'est pas une mesure prouvée. Chaque action listée plus haut doit être tentée sur la machine une fois celle-ci configurée, et le résultat noté : l'action est bloquée, ou elle passe encore.
+ 
+Ce qui passe encore est corrigé, puis testé à nouveau.
+ 
+Le démarrage sur clé USB est le test le plus important. Une clé amorçable est branchée sur la machine, et on vérifie que l'UEFI refuse de démarrer dessus.
+ 
+Un mode kiosque laisse presque toujours passer un raccourci auquel personne n'avait pensé. Le test est le seul moyen de le trouver.
+ 
+## 5.6 Le chiffrement du disque
+ 
+Sans chiffrement, quelqu'un qui ouvre le boîtier et retire le disque peut le lire, mais surtout le modifier : ajouter un script, changer un prompt, remettre le disque en place. La modification ne laisserait aucune trace.
+ 
+Les deux systèmes savent chiffrer un disque, avec BitLocker sous Windows et LUKS sous Linux. Ce qui coince, c'est le déverrouillage. Un disque chiffré doit être déverrouillé pour que le système démarre, et l'installation doit repartir seule après une coupure, sans personne pour taper une phrase de passe.
+ 
+La puce TPM de la machine répond à ce problème. Elle garde la clé et déverrouille le disque au démarrage, mais uniquement dans cette machine. Retiré et branché ailleurs, le disque reste illisible. Le TPM du NUC est présent et activé.
+ 
+| Option | Redémarrage seul | Disque protégé |
+| --- | :-: | :-: |
+| Pas de chiffrement | Oui | Non |
+| Chiffrement avec code au démarrage | Non | Oui |
+| Chiffrement déverrouillé par le TPM | Oui | Oui |
+ 
+Le travail que ça demande dépend du système. Sous Windows, c'est le fonctionnement par défaut de BitLocker et il n'y a presque rien à faire. Sous Linux, le déverrouillage par TPM se configure à la main.
+ 
+Deux points seraient à prévoir. La clé de secours doit être conservée ailleurs qu'à côté de la machine, parce que si la carte ou le TPM tombe en panne, c'est le seul moyen de récupérer les données. Et sur la machine actuelle, qui a deux systèmes installés, un passage par l'un peut déclencher la demande de cette clé au retour sur l'autre, ce qui bloquerait le redémarrage automatique.
