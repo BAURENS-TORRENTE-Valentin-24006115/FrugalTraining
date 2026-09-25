@@ -326,3 +326,21 @@ La puce TPM de la machine répond à ce problème. Elle garde la clé et déverr
 Le travail que ça demande dépend du système. Sous Windows, c'est le fonctionnement par défaut de BitLocker et il n'y a presque rien à faire. Sous Linux, le déverrouillage par TPM se configure à la main.
  
 Deux points seraient à prévoir. La clé de secours doit être conservée ailleurs qu'à côté de la machine, parce que si la carte ou le TPM tombe en panne, c'est le seul moyen de récupérer les données. Et sur la machine actuelle, qui a deux systèmes installés, un passage par l'un peut déclencher la demande de cette clé au retour sur l'autre, ce qui bloquerait le redémarrage automatique.
+
+## 5.7 Ce qu'on ne peut pas empêcher
+ 
+Quelqu'un qui a la machine, des outils et du temps finira par entrer. Aucun logiciel n'y change rien. Le but n'est donc pas de rendre ça impossible, mais de le rendre long et visible.
+ 
+Chaque mesure couvre le cas où la précédente a été contournée :
+ 
+1. Le mode kiosque empêche de sortir de l'œuvre.
+2. S'il est contourné, les pages de réglages demandent un mot de passe.
+3. Si ce mot de passe tombe, le compte n'a pas les droits d'administration.
+4. Si le compte est compromis, le pare-feu limite ce que la machine peut faire.
+5. L'UEFI verrouillé empêche de tout contourner par un démarrage USB.
+6. Si le disque est chiffré, il reste illisible une fois retiré de la machine.
+7. Et les sauvegardes permettent de tout remettre en état.
+C'est ce qu'on appelle la défense en profondeur : on ne mise pas tout sur une seule protection.
+ 
+Une dernière piste ne relève pas du logiciel : enfermer le NUC dans un caisson, en ne laissant passer que les câbles nécessaires. Un port qu'on ne peut pas atteindre n'a pas besoin d'être protégé, et le boîtier devient beaucoup plus long à ouvrir.
+ 
