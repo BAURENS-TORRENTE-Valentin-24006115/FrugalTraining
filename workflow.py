@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Optional, AsyncGenerator
 
 from ai import AI
-from TTS import llm_stream_to_speech, speak_static_text
+from tts import llm_stream_to_speech, speak_static_text
 from settings import (
     DISTANT_MODEL_PROVIDER,
     QUESTIONNAIRE_PATH,
