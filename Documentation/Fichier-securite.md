@@ -269,4 +269,3 @@ Plusieurs logiciels de la machine ont leur propre page de réglages, qui s'ouvre
  
 Le réglage du bouton d'alimentation ne vaut que pour l'appui court. Maintenu quelques secondes, le bouton coupe le courant directement, sans passer par le système.
  
-Une partie de ces mesures repose sur les stratégies de groupe de Windows, qui existent à partir de l'édition Professionnel. Sur l'édition Famille, il faut passer par la base de registre.
