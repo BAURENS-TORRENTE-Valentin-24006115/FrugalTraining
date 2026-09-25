@@ -244,3 +244,29 @@ Cette partie ne dépend pas du système installé.
  
 Démarrer sur une clé USB est le pire cas. Ce n'est plus le même système qui démarre, donc le mode kiosque, les mots de passe et les comptes limités ne servent plus à rien. Les réglages de l'UEFI sont la mesure la plus importante de cette partie.
  
+
+ ## 5.3 Les mesures logicielles
+ 
+| Mesure | Ce que ça empêche | Outil |
+| --- | --- | --- |
+| Verrouiller la session sur une seule application | Plus rien d'autre ne peut être lancé | Accès affecté sous Windows, session restreinte sous Linux |
+| Lancer le navigateur en mode kiosque | Plus de barre d'adresse, plus d'onglets, plus de menus | Option `--kiosk`, identique sur les deux |
+| Neutraliser les raccourcis clavier | Les combinaisons les plus connues ne répondent plus | Stratégies sous Windows, configuration du bureau sous Linux |
+| Désactiver le gestionnaire de tâches | On ne ferme plus l'application ni n'en lance d'autres | Stratégie sous Windows, permissions sous Linux |
+| Empêcher l'ouverture automatique des supports branchés | Une clé branchée ne s'ouvre pas | Réglage système sur les deux |
+| N'autoriser que les périphériques USB prévus | Un clavier ou une clé non autorisés ne fonctionnent pas | Restrictions d'installation sous Windows, USBGuard sous Linux |
+| Faire tourner l'application sous un compte sans droits d'administration | Même sorti de l'œuvre, on ne modifie rien d'important | Compte standard, identique sur les deux |
+| Mettre un mot de passe sur les pages de réglages des logiciels installés | Sortir de l'œuvre ne suffit pas pour modifier quoi que ce soit | Configuration de chaque logiciel |
+| Rendre le bouton d'alimentation inopérant | Un appui court n'éteint plus la machine | Options d'alimentation sous Windows, `logind` sous Linux |
+| Relancer l'application automatiquement si elle s'arrête | Si le programme est fermé, il repart seul | Tâche planifiée sous Windows, service sous Linux |
+| Rallumer la machine automatiquement après une coupure | Une coupure devient une interruption de quelques minutes | Réglage UEFI, indépendant du système |
+ 
+Aucune des mesures précédentes n'empêche de brancher un second clavier. Bloquer l'ouverture automatique arrête une clé USB, mais pas un clavier, qui tape de toute façon. La liste blanche des périphériques USB sert à ça : seuls le clavier de l'installation et la carte son sont autorisés.
+ 
+Ce n'est pas infaillible. Un périphérique peut se déclarer comme étant le clavier autorisé. Reste le cas du clavier qui tombe en panne : un autre clavier ne fonctionnerait pas tel quel. Deux façons de l'anticiper. Autoriser dès le départ un clavier de rechange, rangé avec le matériel de l'installation. Ou ajouter le nouveau clavier à la liste au moment où le besoin se présente, ce qui prend quelques minutes et sera décrit dans le guide remis avec l'installation.
+ 
+Plusieurs logiciels de la machine ont leur propre page de réglages, qui s'ouvre dans un navigateur. Un mot de passe sur chacune évite qu'un visiteur sorti de l'œuvre puisse y toucher.
+ 
+Le réglage du bouton d'alimentation ne vaut que pour l'appui court. Maintenu quelques secondes, le bouton coupe le courant directement, sans passer par le système.
+ 
+Une partie de ces mesures repose sur les stratégies de groupe de Windows, qui existent à partir de l'édition Professionnel. Sur l'édition Famille, il faut passer par la base de registre.
