@@ -1,0 +1,32 @@
+:root {
+    --background: #d9d9d9;
+    --bubble: #1e1e1e;
+    --text: #000000;
+    --blue: #477ff0;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, sans-serif;
+    background-color: var(--background);
+}
+
+.distant {
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: var(--background);
+}
+
+.d {
+    width: 80%;
+    max-width: 600px;
+    padding: 20px;
+    color: var(--text);
+    background-color: var(--bubble);
+    border-radius: 100px;
+    box-shadow: 0 40px 8px rgba(0, 0, 0, 0.1);
+}
