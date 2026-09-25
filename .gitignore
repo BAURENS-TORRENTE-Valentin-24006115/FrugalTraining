@@ -1,4 +1,31 @@
-.vscode
+# Dependencies directory (cloned repos & binaries)
+ai-server/deps/
+
+# Models directory
+ai-server/models/
+
+# Orchestrator & Beacon runtime state / config overrides
+ai-server/state.json
+ai-server/*.lock
+ai-server/.venv*
+ai-server/.test-deps/
+ai-server/*.env
+ai-server/deps/MAIA-Beacon/.env
+
+# Python byte code & environments
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+ENV/
 .env
 .venv
 /assets/models.json
+
+# Build artifacts & logs
+build/
+dist/
+*.log
+log.*
+ai-server/tests/
