@@ -5,6 +5,7 @@
   "llama_release_repo": "MAIA-404-systems/llama-cpp-turboquant",
   "beacon_host": "127.0.0.1",
   "beacon_port": 11343,
+  "context_size": 16384,
   "idle_timeout_seconds": 300,
   "deps_dir": "ai-server/deps",
   "models_dir": "ai-server/models"

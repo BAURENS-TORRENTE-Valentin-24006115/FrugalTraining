@@ -1,232 +1,182 @@
-"""
-AI Unified Client Module
-Supports both local LLM server (MAIA Beacon / llama.cpp) and Cloud APIs (DeepSeek, Mistral, Gemini).
-Features word-by-word streaming generation and optional conversation memory.
-"""
+"""Conversation client for a local or remote AI provider."""
 
-import os
 import json
-import urllib.request
 import urllib.error
-from pathlib import Path
-from typing import Generator, List, Dict, Any, Optional
+import urllib.request
+from collections.abc import Iterator
+
+from settings import AI_ENDPOINTS, AI_MODELS
 
 
-def load_env_file(env_path: Optional[Path] = None) -> Dict[str, str]:
-    """Parse .env file into a dictionary of key-value pairs."""
-    env_vars = {}
-    if env_path is None:
-        env_path = Path(__file__).resolve().parent / ".env"
-    if env_path.exists():
-        try:
-            with open(env_path, "r", encoding="utf-8") as f:
-                for line in f:
-                    line = line.strip()
-                    if not line or line.startswith("#"):
-                        continue
-                    if "=" in line:
-                        k, v = line.split("=", 1)
-                        env_vars[k.strip()] = v.strip().strip("'\"")
-        except Exception:
-            pass
-    return env_vars
+def _text_from_event(event: dict, provider: str) -> list[str]:
+    """Extract assistant text from an OpenAI-compatible completion event."""
+    if "error" in event:
+        error = event["error"]
+        message = error.get("message", str(error)) if isinstance(error, dict) else str(error)
+        raise RuntimeError(f"Erreur {provider} : {message}")
+
+    text = []
+    for choice in event.get("choices", []):
+        delta = choice.get("delta") or {}
+        message = choice.get("message") or {}
+        content = delta.get("content") or message.get("content") or ""
+        if isinstance(content, list):
+            content = "".join(
+                part.get("text", "") for part in content
+                if isinstance(part, dict) and part.get("type") == "text"
+            )
+        if content:
+            text.append(content)
+    return text
 
 
 class AI:
+    """Represent one AI instance with its own configuration and conversation history.
+
+    ``model``, ``base_url``, ``api_key`` and ``system_prompt`` can be changed
+    between calls to ``chat`` or ``stream_chat``.
     """
-    Unified AI Client for switching between Local LLM and Cloud APIs.
-    """
-
-    DEFAULT_ENDPOINTS = {
-        "local": "http://127.0.0.1:11343/v1",
-        "deepseek": "https://api.deepseek.com/v1",
-        "mistral": "https://api.mistral.ai/v1",
-        "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",
-    }
-
-    DEFAULT_MODELS = {
-        "local": "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
-        "deepseek": "deepseek-chat",
-        "mistral": "open-mistral-nemo",
-        "gemini": "gemini-1.5-pro",
-    }
-
-    ENV_KEY_NAMES = {
-        "deepseek": "DEEPSEEK_API",
-        "mistral": "MISTRAL_API",
-        "gemini": "GEMINI_API",
-    }
 
     def __init__(
         self,
         provider: str = "local",
-        model: Optional[str] = None,
-        api_key: Optional[str] = None,
-        base_url: Optional[str] = None,
-        system_prompt: Optional[str] = None,
-    ):
-        """
-        Initialize the AI client.
-        
-        :param provider: "local", "deepseek", "mistral", or "gemini"
-        :param model: Specific model identifier (optional, uses provider defaults)
-        :param api_key: API key override (optional, loaded from .env by default)
-        :param base_url: API Base URL override (optional)
-        :param system_prompt: Initial system context for the model (optional)
-        """
-        self.provider = provider.lower()
-        self.use_api = self.provider != "local"
-        self.model = model or self.DEFAULT_MODELS.get(self.provider, "default")
-        self.base_url = (base_url or self.DEFAULT_ENDPOINTS.get(self.provider, "http://127.0.0.1:11343/v1")).rstrip("/")
+        model: str | None = None,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        system_prompt: str | None = None,
+        temperature: float = 0.7,
+        max_tokens: int | None = None,
+    ) -> None:
+        provider = provider.lower()
+        if provider not in AI_ENDPOINTS:
+            raise ValueError(f"Fournisseur inconnu : {provider}")
 
-        # Load API key from parameter, os.environ, or .env file
-        env_vars = load_env_file()
-        env_key_name = self.ENV_KEY_NAMES.get(self.provider, f"{self.provider.upper()}_API")
-        self.api_key = api_key or os.environ.get(env_key_name) or env_vars.get(env_key_name, "")
+        self.provider = provider
+        self.model = model or AI_MODELS[provider]
+        self.base_url = (base_url or AI_ENDPOINTS[provider]).rstrip("/")
+        self.api_key = api_key or ""
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+        self.messages: list[dict[str, str]] = []
+        self.system_prompt = system_prompt
 
-        self.messages: List[Dict[str, str]] = []
+    @property
+    def system_prompt(self) -> str | None:
+        if self.messages and self.messages[0]["role"] == "system":
+            return self.messages[0]["content"]
+        return None
 
-        if system_prompt:
-            self.set_system_prompt(system_prompt)
-
-    def set_system_prompt(self, content: str) -> None:
-        """Set or update the system prompt at the beginning of the conversation history."""
-        if self.messages and self.messages[0].get("role") == "system":
-            self.messages[0]["content"] = content
-        else:
+    @system_prompt.setter
+    def system_prompt(self, content: str | None) -> None:
+        if self.messages and self.messages[0]["role"] == "system":
+            self.messages.pop(0)
+        if content:
             self.messages.insert(0, {"role": "system", "content": content})
 
+    def set_system_prompt(self, content: str) -> None:
+        """Keep the method for callers using the older API."""
+        self.system_prompt = content
+
     def clear_history(self, keep_system_prompt: bool = True) -> None:
-        """Clear conversation history, optionally preserving the system prompt."""
-        if keep_system_prompt and self.messages and self.messages[0].get("role") == "system":
-            self.messages = [self.messages[0]]
-        else:
-            self.messages = []
+        prompt = self.system_prompt if keep_system_prompt else None
+        self.messages.clear()
+        self.system_prompt = prompt
 
     def stream_chat(
         self,
         prompt: str,
         keep_history: bool = True,
-        temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
-    ) -> Generator[str, None, None]:
-        """
-        Send a prompt and stream the response word-by-word (Server-Sent Events).
-        
-        :param prompt: User message to send
-        :param keep_history: Whether to save this exchange in conversation memory
-        :param temperature: Sampling temperature
-        :param max_tokens: Maximum tokens to generate
-        :return: Generator yielding text chunks as they arrive from the model
-        """
-        # Prepare request messages context
-        request_messages = list(self.messages)
-        request_messages.append({"role": "user", "content": prompt})
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> Iterator[str]:
+        """Send a message and yield response fragments as they arrive."""
+        if self.provider != "local" and not self.api_key:
+            raise ValueError(f"Clé API manquante pour {self.provider}")
 
-        url = f"{self.base_url}/chat/completions"
-        headers = {
-            "Content-Type": "application/json",
-            "User-Agent": "AI-Python-Client/1.0",
-        }
-
-        if self.use_api and self.api_key:
-            headers["Authorization"] = f"Bearer {self.api_key}"
-
-        payload: Dict[str, Any] = {
+        payload = {
             "model": self.model,
-            "messages": request_messages,
+            "messages": [*self.messages, {"role": "user", "content": prompt}],
             "stream": True,
-            "temperature": temperature,
+            "temperature": self.temperature if temperature is None else temperature,
         }
-        if max_tokens:
-            payload["max_tokens"] = max_tokens
+        token_limit = self.max_tokens if max_tokens is None else max_tokens
+        if token_limit is not None:
+            payload["max_tokens"] = token_limit
 
-        import subprocess
-        import json
+        headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        request = urllib.request.Request(
+            f"{self.base_url}/chat/completions",
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers=headers,
+        )
 
-        payload_json = json.dumps(payload, ensure_ascii=False)
-        cmd = ["curl.exe", "-s", "-N", "-X", "POST", url]
-        for h_key, h_val in headers.items():
-            cmd.extend(["-H", f"{h_key}: {h_val}"])
-        cmd.extend(["-d", "@-"])
-
-        full_response_text = []
-
+        chunks: list[str] = []
+        last_event: dict = {}
+        response_type = "unknown"
         try:
-            proc = subprocess.Popen(
-                cmd,
-                stdin=subprocess.PIPE,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                encoding="utf-8",
-                errors="replace"
+            with urllib.request.urlopen(request, timeout=120) as response:
+                response_type = response.headers.get_content_type()
+                if response_type == "application/json":
+                    event = json.load(response)
+                    last_event = event
+                    for chunk in _text_from_event(event, self.provider):
+                        chunks.append(chunk)
+                        yield chunk
+                else:
+                    for raw_line in response:
+                        line = raw_line.decode("utf-8", errors="replace").strip().lstrip("\ufeff")
+                        if line.startswith("data:"):
+                            data = line[5:].strip()
+                            if data == "[DONE]":
+                                break
+                        elif line.startswith("{"):
+                            # Beacon can wrap an upstream JSON error in an SSE response.
+                            data = line
+                        else:
+                            continue
+                        if not data:
+                            continue
+                        event = json.loads(data)
+                        last_event = event
+                        for chunk in _text_from_event(event, self.provider):
+                            chunks.append(chunk)
+                            yield chunk
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Erreur HTTP {exc.code} ({self.provider}) : {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"Connexion impossible à {self.provider} : {exc.reason}") from exc
+
+        if not chunks:
+            choices = last_event.get("choices", [])
+            choice = choices[0] if choices else {}
+            finish_reason = choice.get("finish_reason")
+            delta_fields = sorted((choice.get("delta") or {}).keys())
+            details = f"; response type={response_type}"
+            if finish_reason:
+                details += f"; finish_reason={finish_reason}"
+            if delta_fields:
+                details += f"; delta fields={', '.join(delta_fields)}"
+            if not last_event:
+                details += "; no completion event received"
+            raise RuntimeError(
+                f"{self.provider} a terminé la réponse sans générer de texte{details}"
             )
-            try:
-                proc.stdin.write(payload_json)
-                proc.stdin.close()
-            except (BrokenPipeError, OSError):
-                pass
 
-            for raw_line in proc.stdout:
-                line = raw_line.strip()
-                if not line:
-                    continue
-                if line.startswith("data:"):
-                    data_str = line[5:].strip()
-                    if data_str == "[DONE]":
-                        break
-                    try:
-                        data_json = json.loads(data_str)
-                        choices = data_json.get("choices", [])
-                        if choices:
-                            delta = choices[0].get("delta", {})
-                            content_chunk = delta.get("content", "")
-                            if content_chunk:
-                                full_response_text.append(content_chunk)
-                                yield content_chunk
-                    except json.JSONDecodeError:
-                        continue
-                elif line.startswith("{") and "error" in line:
-                    try:
-                        err_obj = json.loads(line)
-                        err_msg = err_obj.get("error", {}).get("message") or line
-                        raise RuntimeError(f"API Error from {self.provider}: {err_msg}")
-                    except json.JSONDecodeError:
-                        pass
-
-            proc.stdout.close()
-            proc.wait(timeout=5)
-        except Exception as e:
-            if isinstance(e, RuntimeError):
-                raise
-            raise RuntimeError(f"Streaming error with {self.provider} ({url}): {e}") from e
-
-        # If memory retention is active, update self.messages
         if keep_history:
-            self.messages.append({"role": "user", "content": prompt})
-            self.messages.append({"role": "assistant", "content": "".join(full_response_text)})
+            self.messages.extend((
+                {"role": "user", "content": prompt},
+                {"role": "assistant", "content": "".join(chunks)},
+            ))
 
     def chat(
         self,
         prompt: str,
         keep_history: bool = True,
-        temperature: float = 0.7,
-        max_tokens: Optional[int] = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
     ) -> str:
-        """
-        Send a prompt and return the complete string response (aggregates stream).
-        """
-        chunks = list(
-            self.stream_chat(
-                prompt=prompt,
-                keep_history=keep_history,
-                temperature=temperature,
-                max_tokens=max_tokens,
-            )
-        )
-        return "".join(chunks)
-
-
-# Backward compatibility alias
-ai = AI
+        """Return the complete response."""
+        return "".join(self.stream_chat(prompt, keep_history, temperature, max_tokens))
