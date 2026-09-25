@@ -197,3 +197,32 @@ Le pare-feu local du NUC (`nftables` ou `ufw`) constitue la première ligne de
 -   **NTP (Synchronisation horaire) :** Autoriser le port UDP 123 pour garantir l'horodatage correct des logs d'erreurs et de sécurité.
     
 -   **Tout autre flux sortant :** Bloqué (interdiction de la télémétrie OS, des mises à jour non planifiées en plein festival et des connexions vers des domaines tiers).
+
+# 5\. Résister à quelqu'un qui a la machine à portée de main
+ 
+Le NUC est accroché au mur, et le clavier à disposition de tous. Le public a donc accès à deux choses : les touches, et la machine elle-même. Ce ne sont pas les mêmes risques et ils ne se traitent pas pareil.
+ 
+Ces risques viennent de l'accès physique, pas du système installé. Ce sont les outils pour s'en protéger qui changent d'un système à l'autre.
+ 
+## 5.1 Actions possibles depuis le clavier
+ 
+Ces actions ne demandent aucune compétence technique.
+ 
+| Ce qu'il peut faire | Exemple |
+| --- | --- |
+| Ouvrir une autre page dans le navigateur, y compris les pages de configuration de la machine | `Ctrl+T` puis une adresse |
+| Sortir du plein écran et voir le bureau | `F11` ou `Échap` |
+| Passer sur une autre fenêtre ouverte | `Alt+Tab` |
+| Fermer l'application | `Alt+F4` |
+| Lancer n'importe quel programme | `Win+R` |
+| Ouvrir l'explorateur de fichiers | `Win+E` |
+| Ouvrir le menu du système | Touche Windows |
+| Ouvrir le gestionnaire de tâches, pour fermer l'application ou en lancer une autre | `Ctrl+Shift+Échap` |
+| Atteindre l'écran de sécurité du système | `Ctrl+Alt+Suppr` |
+| Basculer sur une console texte, en dehors de l'interface graphique | `Ctrl+Alt+F2` sous Linux |
+ 
+Les touches changent d'un système à l'autre, les possibilités non.
+ 
+Le gestionnaire de tâches sert à fermer l'application ou à en lancer une autre. `Ctrl+Alt+Suppr` est un cas à part : le système le traite avant tout le reste, on ne peut pas le neutraliser comme un raccourci normal, et seul le mode kiosque limite ce qu'on y trouve.
+ 
+Il existe des dizaines d'autres raccourcis, sans compter le clic droit et les menus. Un seul qui reste actif suffit pour sortir de l'œuvre, donc les bloquer un par un ne marchera jamais. On verrouille plutôt la session sur une seule application, et tout ce qui n'était pas prévu est refusé. C'est la même logique que pour le pare-feu : on liste ce qui est autorisé, pas ce qui est interdit.
