@@ -4,6 +4,7 @@ Scans hardware acceleration capabilities (CUDA, Vulkan, CPU vector extensions),
 system memory, CPU architecture, and optional CMake for source builds.
 """
 import ctypes
+import json
 import os
 from pathlib import Path
 import platform
@@ -11,10 +12,12 @@ import shutil
 import struct
 import subprocess
 import sys
+import tempfile
 import time
 from typing import Any, Optional, Union
 import urllib.request
 import uuid
+import zipfile
 
 from configs import init_file_logger, safe_urlopen
 
@@ -173,11 +176,107 @@ def clean_corrupted_local_dlls(target_dir: Union[str, Path]) -> None:
                 pass
 
 
+def check_openssl_dlls_installed(target_dir: Union[str, Path]) -> bool:
+    """Return whether both OpenSSL 3 runtime DLLs are valid 64-bit files."""
+    target = Path(target_dir)
+    names = ("libssl-3-x64.dll", "libcrypto-3-x64.dll")
+    return all((target / name).is_file() and is_pe_64bit(target / name) for name in names)
+
+
+def ensure_openssl_dlls(target_dir: Union[str, Path]) -> bool:
+    """Find or download the OpenSSL 3 DLLs required by the Windows llama binary."""
+    if platform.system() != "Windows":
+        return True
+    dest_dir = Path(target_dir)
+    if platform.machine().lower() not in ("amd64", "x86_64", "x64"):
+        return False
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    if check_openssl_dlls_installed(dest_dir):
+        return True
+
+    print("\n[!] OpenSSL 3 DLLs (libssl-3-x64.dll / libcrypto-3-x64.dll) are missing for llama-server.")
+    dll_names = ("libssl-3-x64.dll", "libcrypto-3-x64.dll")
+    candidate_dirs = [
+        Path(r"C:\Program Files\Git\mingw64\bin"),
+        Path(r"C:\Program Files\OpenSSL-Win64\bin"),
+        Path(sys.base_prefix) / "Library" / "bin",
+    ]
+    candidate_dirs.extend(
+        Path(entry) for entry in os.environ.get("PATH", "").split(os.pathsep)
+        if entry and "SysWOW64" not in entry and "Program Files (x86)" not in entry
+    )
+    found: dict[str, Path] = {}
+    for name in dll_names:
+        for directory in candidate_dirs:
+            candidate = directory / name
+            if candidate.is_file() and is_pe_64bit(candidate):
+                found[name] = candidate
+                break
+    if len(found) == len(dll_names):
+        try:
+            for name, source in found.items():
+                shutil.copy2(source, dest_dir / name)
+            if check_openssl_dlls_installed(dest_dir):
+                print("[OK] OpenSSL 3 DLLs copied from a local installation.")
+                return True
+        except OSError as exc:
+            print(f"[!] Could not copy local OpenSSL DLLs: {exc}")
+
+    print("[+] Searching for OpenSSL 3 DLLs in the Git for Windows MinGit package...")
+    try:
+        api_url = "https://api.github.com/repos/git-for-windows/git/releases/latest"
+        request = urllib.request.Request(api_url, headers={"User-Agent": "MAIA-Beacon-Downloader/1.0"})
+        download_url = None
+        try:
+            with safe_urlopen(request, timeout=30) as response:
+                release = json.loads(response.read().decode("utf-8"))
+            for asset in release.get("assets", []):
+                if asset["name"].startswith("MinGit-") and asset["name"].endswith("64-bit.zip"):
+                    download_url = asset["browser_download_url"]
+                    break
+        except (OSError, ValueError, KeyError):
+            pass
+        if not download_url:
+            download_url = (
+                "https://github.com/git-for-windows/git/releases/download/"
+                "v2.55.0.windows.5/MinGit-2.55.0.5-64-bit.zip"
+            )
+
+        with tempfile.TemporaryDirectory(prefix="frugal-openssl-") as temp_dir:
+            archive = Path(temp_dir) / "mingit.zip"
+            request = urllib.request.Request(download_url, headers={"User-Agent": "MAIA-Beacon-Downloader/1.0"})
+            with safe_urlopen(request, timeout=90) as response, archive.open("wb") as output:
+                shutil.copyfileobj(response, output)
+            with zipfile.ZipFile(archive) as package:
+                members = {}
+                for name in dll_names:
+                    matches = [entry for entry in package.namelist() if entry.lower().endswith("/" + name.lower())]
+                    if not matches:
+                        raise RuntimeError(f"MinGit archive does not contain {name}")
+                    members[name] = matches[0]
+                extracted = Path(temp_dir) / "dlls"
+                extracted.mkdir()
+                for name, member in members.items():
+                    with package.open(member) as source, (extracted / name).open("wb") as output:
+                        shutil.copyfileobj(source, output)
+                    if not is_pe_64bit(extracted / name):
+                        raise RuntimeError(f"Downloaded {name} is not a valid 64-bit DLL")
+                for name in dll_names:
+                    shutil.copy2(extracted / name, dest_dir / name)
+        if check_openssl_dlls_installed(dest_dir):
+            print("[OK] OpenSSL 3 DLLs downloaded and installed beside llama-server.")
+            return True
+        raise RuntimeError("OpenSSL DLL validation failed after installation")
+    except (OSError, ValueError, RuntimeError, zipfile.BadZipFile, subprocess.SubprocessError) as exc:
+        print(f"[!] Automatic OpenSSL 3 DLL repair failed: {exc}")
+        return False
+
+
 def ensure_standalone_dlls(target_dir: Optional[Union[str, Path]] = None) -> bool:
     """Ensure runtime 64-bit DLLs on Windows are validated and present in target_dir.
 
-    Cleans 32-bit DLLs, ensures VC++ Redistributable is installed, copies 64-bit VC DLLs
-    from System32. The executable probe catches any other missing DLLs.
+    Cleans incompatible DLLs, ensures VC++ Redistributable and OpenSSL 3 runtimes,
+    and copies the required DLLs beside the executable.
 
     Args:
         target_dir (str or Path, optional): Target application directory for DLLs. Defaults to None.
@@ -225,7 +324,7 @@ def ensure_standalone_dlls(target_dir: Optional[Union[str, Path]] = None) -> boo
             except Exception:
                 pass
 
-    return True
+    return ensure_openssl_dlls(dest_dir)
 
 
 def check_tool(tool_name: str) -> bool:
