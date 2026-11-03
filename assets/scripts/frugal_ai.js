@@ -68,6 +68,7 @@ window.addEventListener('pywebviewready', function() {
             button.addEventListener('click', () => {
                 document.querySelectorAll('.persona-button').forEach(b => b.classList.remove('is-selected'));
                 button.classList.add('is-selected');
+                document.getElementById('role-icon').innerText = `Role: ${role.icon || 'img/persona.svg'}`;
                 document.getElementById('role-header').innerText = `Role: ${role.name}`;
                 window.pywebview.api.select_role(role.id);
             });
