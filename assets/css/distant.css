@@ -1,6 +1,6 @@
 :root {
     --background: #d9d9d9;
-    --bubble: #1e1e1e;
+    --bubble: #434343;
     --text: #000000;
     --blue: #477ff0;
 }
@@ -16,7 +16,7 @@ body {
     width: 100%;
     height: 100vh;
     display: flex;
-    justify-content: center;
+    justify-content: space-evenly;
     align-items: center;
     background-color: var(--background);
 }
@@ -26,7 +26,13 @@ body {
     max-width: 600px;
     padding: 20px;
     color: var(--text);
-    background-color: var(--bubble);
-    border-radius: 100px;
-    box-shadow: 0 40px 8px rgba(0, 0, 0, 0.1);
+    background-color: var(--background);
+    border: 3px solid var(--text);
+    border-radius: 30px;
+    box-shadow: 8px 12px 3px var(--bubble);
+}
+
+.model-icon { 
+    height: 250px;
+    padding: 300px 10px 10px 1px;
 }
