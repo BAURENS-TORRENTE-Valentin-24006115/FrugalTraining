@@ -1,7 +1,7 @@
 let typingInterval = null;
 
 function displayResponse(text, progressive = true) {
-    const responseBox = document.getElementById('ai-reponse');
+    const responseBox = document.getElementById('ai-answer');
     clearInterval(typingInterval);
 
     if (!progressive) {
@@ -29,7 +29,7 @@ window.addEventListener('pywebviewready', function() {
         // 1. Initial Texts & Scores
         document.getElementById('role-header').innerText = `Role: ${data.current_role_name}`;
         document.getElementById('average-score-text').innerText = data.average_score;
-        displayResponse(data.reponse_ia, false);
+        displayResponse(data.reponse_ia_frugal, false);
 
         // 2. Build Chart
         const chartGrid = document.getElementById('chart-grid');
