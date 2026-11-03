@@ -5,7 +5,7 @@ import tts
 
 
 class FrugalInterface:
-    def __init__(self, models_file='assets/models.json', roles_file='assets/personas.json'):
+    def __init__(self, models_file='assets/json/models.json', roles_file='assets/json/personas.json'):
         self.models_file = models_file
         self.roles_file = roles_file
 
