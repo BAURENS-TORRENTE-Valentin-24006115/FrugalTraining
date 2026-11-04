@@ -57,7 +57,7 @@ window.addEventListener('pywebviewready', function() {
             button.className = 'persona-button';
             button.type = 'button';
             button.innerHTML = `
-                <img src='${role.icon || 'img/persona.svg'}' alt=''>
+                <img src='${role.icon || 'img/personnas/persona.svg'}' alt=''>
                 <span>${role.name}</span>
             `;
 

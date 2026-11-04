@@ -37,7 +37,7 @@ class FrugalInterface:
             {
                 "id": m["id"],
                 "name": m["name"],
-                "image": m.get("image", "img/gemini.png"),
+                "image": m.get("image", "img/models/gemini.png"),
                 "score": m.get("score", 0)
             }
             for m in self.models
