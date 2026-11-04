@@ -21,7 +21,7 @@ venv/
 ENV/
 .env
 .venv
-/assets/models.json
+models.json
 
 # Build artifacts & logs
 build/

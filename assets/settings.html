@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <title>Paramètres</title>
+    <link rel='stylesheet' href='css/settings.css'>
+</head>
+<body>
+
+    <div class="sidebar">
+        <button class="nav-btn">Style</button> 
+        <button class="nav-btn active" onclick="switchTab('personas')">Personnas</button>
+        <button class="nav-btn" onclick="switchTab('models')">IA</button>
+    </div>
+
+    <div class="content">
+        <!-- PERSONAS TAB -->
+        <div id="tab-personas" class="tab-panel active">
+            <h2>Gestion des Personnas</h2>
+            <br>
+            <div id="personas-container" class="item-list"></div>
+            
+            <h3>Ajouter / Modifier un Personna</h3>
+            <form id="form-persona" onsubmit="event.preventDefault(); savePersona();">
+                <label>ID (minuscules uniquement, ex: priest):</label>
+                <input type="text" id="p-id" required oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9_-]/g, '')">
+                
+                <label>Nom (ex: Prêtre):</label>
+                <input type="text" id="p-name" required>
+                
+                <label>Icône (chemin):</label>
+                <input type="text" id="p-icon" value="img/personnas/persona.svg" required>
+                
+                <label>Persona (Prompt):</label>
+                <textarea id="p-persona" required></textarea>
+                
+                <div class="btn-group">
+                    <button type="submit" class="btn-save">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+
+        <!-- IA MODELS TAB -->
+        <div id="tab-models" class="tab-panel">
+            <h2>Gestion des Modèles d'IA</h2>
+            <br>
+            <div id="models-container" class="item-list"></div>
+            
+            <h3>Ajouter / Modifier une IA</h3>
+            <form id="form-model" onsubmit="event.preventDefault(); saveModel();">
+                <label>ID (minuscules uniquement, ex: gemini):</label>
+                <input type="text" id="m-id" required oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9_-]/g, '')">
+                
+                <label>Nom (ex: Gemini):</label>
+                <input type="text" id="m-name" required>
+                
+                <label>Clé API:</label>
+                <input type="password" id="m-key" required>
+                
+                <label>Image (chemin):</label>
+                <input type="text" id="m-image" value="img/models/gemini.png" required>
+                
+                <label>Score (0-100):</label>
+                <input type="number" id="m-score" value="50" min="0" max="100" required>
+                
+                <div class="btn-group">
+                    <button type="submit" class="btn-save">Enregistrer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script src="scripts/settings.js"></script>
+</body>
+</html>
