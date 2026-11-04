@@ -1,5 +1,6 @@
+// Demande à Python d'ouvrir le panel des paramètres
 function ouvrirPanelAdmin() {
-    console.log("Accès admin OK");
+    window.pywebview.api.ouvrir_panel_admin();
 }
 
 // Affiche la fenêtre de mot de passe, sauf si la session admin est encore valide
