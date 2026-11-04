@@ -1,8 +1,14 @@
 import asyncio
+import json
 from google import genai
 import tts
+import dialogue_sound
 
-API_KEY = "VOTRE_CLE_API_GEMINI_ICI"
+def load_json_file(filepath: str) -> list:
+    with open(filepath, 'r', encoding='utf-8') as f:
+        return json.load(f)
+
+API_KEY = load_json_file("assets/json/models.json")[0].get("api_key", "VOTRE_CLE_API_GEMINI_ICI")
 client = genai.Client(api_key=API_KEY)
 
 async def gemini_llm_stream(prompt):
@@ -26,6 +32,16 @@ async def gemini_llm_stream(prompt):
                 # et laisse le temps au regex de EdgeTTS de détecter les points.
                 await asyncio.sleep(0.01)
 
+def gemini_llm(prompt):
+    """
+    Interroge Gemini via la nouvelle API de Chat (Interactions API) recommandée,
+    et retourne le texte complet.
+    """
+    chat = client.chats.create(model='gemini-3.6-flash')
+    response = chat.send_message(prompt)
+    
+    return response.text
+
 async def main():
     if API_KEY == "VOTRE_CLE_API_GEMINI_ICI":
         print("ATTENTION : Vous devez insérer votre clé API Gemini dans le script.")
@@ -38,10 +54,18 @@ async def main():
     print(f"Utilisateur: {prompt}\n")
     
     # On crée le flux Gemini
-    stream = gemini_llm_stream(prompt)
+    stream = gemini_llm(prompt)
 
     # On passe ce flux à votre script tts.py
-    await tts.llm_stream_to_speech(stream, "fr-CA-AntoineNeural")
+    # await tts.llm_stream_to_speech(stream, "fr-CA-AntoineNeural")
+
+    # On passe ce flux à votre script dialogue_sound.py
+    await dialogue_sound.play_multi_sample_word_dialogue(
+        text=stream,
+        samples_list=dialogue_sound.load_sample_folder("assets/audio/answering_ia_dialogue"),
+        word_delay=0.04,
+        pitch_jitter=0.15
+    )
 
 if __name__ == "__main__":
     asyncio.run(main())
