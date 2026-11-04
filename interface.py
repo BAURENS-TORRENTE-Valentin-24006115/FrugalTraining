@@ -3,6 +3,7 @@ import os
 import webview
 import tts
 import admin_auth
+import settings_manager
 
 
 class FrugalInterface:
@@ -83,7 +84,21 @@ class FrugalInterface:
         return self._admin.est_connecte()
 
     def deconnecter_admin(self):
-        self._admin.deconnexion()        
+        self._admin.deconnexion()   
+
+    def ouvrir_panel_admin(self):
+        """Ouvre la fenêtre des paramètres, uniquement si l'admin est connecté."""
+        if not self._admin.est_connecte():
+            return False
+        panel = settings_manager.SettingsManager()
+        webview.create_window(
+            title="Configuration - IA Frugal",
+            url="assets/settings.html",
+            js_api=panel,
+            width=900,
+            height=600
+        )
+        return True     
 
     # --- Methods for Python side ---
 
