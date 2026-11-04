@@ -1,0 +1,77 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+body {
+    background-color: #1e1e1e;
+    color: #f7f7f7;
+    font-family: 'Trebuchet MS', Arial, sans-serif;
+    display: flex;
+    height: 100vh;
+}
+
+/* Sidebar Navigation */
+.sidebar {
+    width: 200px;
+    background: #141414;
+    border-right: 2px solid #333;
+    padding: 20px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.nav-btn {
+    background: #282828;
+    color: white;
+    border: 1px solid #444;
+    padding: 12px;
+    cursor: pointer;
+    text-align: left;
+    border-radius: 6px;
+    font-size: 14px;
+}
+.nav-btn:hover { background: #383838; }
+.nav-btn.active { background: #477ff0; border-color: #477ff0; }
+.nav-btn.disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Main Content Panel */
+.content {
+    flex: 1;
+    padding: 30px;
+    overflow-y: auto;
+}
+
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
+/* Item Cards */
+.item-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+.item-card {
+    background: #292929;
+    border: 1px solid #444;
+    padding: 12px 20px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Forms */
+form { background: #252525; padding: 20px; border-radius: 6px; display: flex; flex-direction: column; gap: 12px; }
+label { font-size: 12px; color: #aaa; }
+input, textarea {
+    background: #181818;
+    border: 1px solid #444;
+    color: white;
+    padding: 8px;
+    border-radius: 4px;
+    width: 100%;
+}
+textarea { height: 160px; resize: vertical; }
+
+.btn-group { display: flex; gap: 10px; margin-top: 10px; }
+.btn-save { background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+.btn-edit { background: #ffc107; color: black; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+.btn-delete { background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }

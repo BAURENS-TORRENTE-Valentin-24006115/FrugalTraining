@@ -5,7 +5,7 @@ import tts
 
 
 class FrugalInterface:
-    def __init__(self, models_file='assets/models.json', roles_file='assets/personas.json'):
+    def __init__(self, models_file='assets/json/models.json', roles_file='assets/json/personas.json'):
         self.models_file = models_file
         self.roles_file = roles_file
 
@@ -37,7 +37,7 @@ class FrugalInterface:
             {
                 "id": m["id"],
                 "name": m["name"],
-                "image": m.get("image", "img/gemini.png"),
+                "image": m.get("image", "img/models/gemini.png"),
                 "score": m.get("score", 0)
             }
             for m in self.models
