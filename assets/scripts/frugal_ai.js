@@ -28,25 +28,32 @@ window.addEventListener('pywebviewready', function() {
 
         // 1. Initial Texts & Scores
         document.getElementById('role-header').innerText = `Role: ${data.current_role_name}`;
-        document.getElementById('average-score-text').innerText = data.average_score;
         displayResponse(data.reponse_ia_frugal, false);
 
         // 2. Build Chart
         const chartGrid = document.getElementById('chart-grid');
         const chartLabels = document.getElementById('chart-labels');
-        chartGrid.innerHTML = '';
-        chartLabels.innerHTML = '';
+        const averageScore = document.getElementById('average-score-text');
 
-        data.models.forEach(model => {
-            const bar = document.createElement('i');
-            bar.style.height = `${model.score}%`;
-            bar.title = `${model.name}: ${model.score}%`;
-            chartGrid.appendChild(bar);
+        if (averageScore) {
+            averageScore.innerText = data.average_score;
+        }
 
-            const label = document.createElement('span');
-            label.innerText = model.name;
-            chartLabels.appendChild(label);
-        });
+        if (chartGrid && chartLabels) {
+            chartGrid.innerHTML = '';
+            chartLabels.innerHTML = '';
+
+            data.models.forEach(model => {
+                const bar = document.createElement('i');
+                bar.style.height = `${model.score}%`;
+                bar.title = `${model.name}: ${model.score}%`;
+                chartGrid.appendChild(bar);
+
+                const label = document.createElement('span');
+                label.innerText = model.name;
+                chartLabels.appendChild(label);
+            });
+        }
 
         // 3. Render Roles (Bottom Left)
         const rolesContainer = document.getElementById('roles-list');
@@ -57,7 +64,7 @@ window.addEventListener('pywebviewready', function() {
             button.className = 'persona-button';
             button.type = 'button';
             button.innerHTML = `
-                <img src='${role.icon || 'img/personnas/persona.svg'}' alt=''>
+                <img src='${role.icon || 'img/persona.svg'}' alt=''>
                 <span>${role.name}</span>
             `;
 

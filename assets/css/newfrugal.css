@@ -115,7 +115,7 @@ body {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 2px 6px;
+	gap: 0;
 	min-width: 0;
 	padding: 0;
 }
@@ -133,17 +133,16 @@ body {
 .model-button {
 	display: inline-flex;
 	align-items: center;
-	gap: 5px;
 	min-width: 0;
-	padding: 2px 3px;
+	padding: 0 4px;
 	border: 0;
 	background: transparent;
 	color: var(--text);
 	font: inherit;
-	font-size: clamp(12px, 1.35vw, 17px);
+	font-size: clamp(12px, 1.2vw, 16px);
 	line-height: 1.2;
 	cursor: pointer;
-	transition: background-color .18s ease;
+	transition: opacity .18s ease;
 }
 
 .persona-button {
@@ -159,14 +158,26 @@ body {
 	display: none;
 }
 
+.persona-button + .persona-button::before,
+.model-button + .model-button::before {
+	margin-right: 8px;
+	color: var(--text);
+	content: '|';
+	font-weight: 400;
+}
+
 .persona-button:hover,
 .persona-button:focus-visible,
 .model-button:hover,
-.model-button:focus-visible,
+.model-button:focus-visible {
+	outline: none;
+	opacity: .7;
+}
+
 .persona-button.is-selected,
 .model-button.is-selected {
-	outline: none;
-	background: #202020;
+	background: transparent;
+	color: var(--text);
 }
 
 @media (max-width: 600px) {
