@@ -15,7 +15,7 @@ function afficherMotDePasse() {
 }
 
 // Ferme la fenêtre de mot de passe et la remet à zéro 
-    function cacherMotDePasse() {
+function cacherMotDePasse() {
     document.getElementById("admin-login").style.display = "none";
     document.getElementById("admin-password").value = "";
     document.getElementById("admin-message").innerText = "";
