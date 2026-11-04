@@ -5,6 +5,7 @@
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <title>IA Frugal</title>
     <link rel='stylesheet' href='css/frugal.css'>
+    <link rel='stylesheet' href='css/admin.css'>
 </head>
 <body>
     <main class='dashboard'>
@@ -34,6 +35,16 @@
             </article>
         </section>
     </main>
+    <div id="admin-login">
+    <div class="admin-box">
+        <h2>Accès admin</h2>
+        <input type="password" id="admin-password">
+        <p id="admin-message"></p>
+        <button onclick="cacherMotDePasse()">Annuler</button>
+        <button onclick="validerMotDePasse()">Valider</button>
+    </div>
+    </div>
+    <script src="scripts/admin.js"></script>
     <script src="scripts/frugal_ai.js"></script>
 </body>
 </html>
