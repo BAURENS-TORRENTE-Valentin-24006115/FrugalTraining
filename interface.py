@@ -101,27 +101,17 @@ class FrugalInterface:
 
 
 def launch_windows(http_server=False, debug=False):
-    monitors = webview.screens
-    print(f"[INFO] Detected {len(monitors)} monitor(s): {monitors}")
-    if len(monitors) < 2:
-        print("[WARNING] Less than 2 monitors detected. Both windows will open on the primary monitor.")
-        monitors = [monitors[0], monitors[0]]
-    screen_for_ai_1 = monitors[0]
-    screen_for_ai_2 = monitors[1]
-
     interface = FrugalInterface()
     interface._frugal_window = webview.create_window(
         title="IA Frugal",
         url="assets/frugal_ai.html",
         js_api=interface,
-        screen=screen_for_ai_1,
         fullscreen=True
     )
     interface._answering_window = webview.create_window(
         title="IA Repondante",
         url="assets/answering_ai.html",
         js_api=interface,
-        screen=screen_for_ai_2,
         fullscreen=True
     )
 
