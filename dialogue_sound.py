@@ -93,6 +93,7 @@ async def play_multi_sample_word_dialogue(
             sound_cache[cache_key] = pitch_shift_samples(
                 selected_samples, pitch_factor
             )
+        sound_cache[cache_key].set_volume(0.20)
 
         # 3. Play sound clip
         sound_cache[cache_key].play()
