@@ -59,6 +59,7 @@ function editPersona(id) {
     document.getElementById('p-name').value = p.name;
     document.getElementById('p-icon').value = p.icon || '';
     document.getElementById('p-persona').value = p.persona;
+    document.getElementById('p-letter').value = p.letter;
 }
 
 function savePersona() {
@@ -66,6 +67,7 @@ function savePersona() {
     const name = document.getElementById('p-name').value.trim();
     const icon = document.getElementById('p-icon').value.trim();
     const persona = document.getElementById('p-persona').value.trim();
+    const letter = document.getElementById('p-letter').value.trim().toUpperCase();
 
     // Verify non-empty fields
     if (!id || !name || !icon || !persona) {
@@ -79,7 +81,13 @@ function savePersona() {
         return;
     }
 
-    const item = { id, name, icon, persona };
+    // Verify single uppercase letter for letter
+    if (!/^[A-Z]$/.test(letter)) {
+        alert("La lettre doit être une seule lettre majuscule.");
+        return;
+    }
+
+    const item = { id, name, icon, persona, letter };
 
     window.pywebview.api.save_persona(item).then(() => {
         loadData();
