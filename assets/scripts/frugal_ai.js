@@ -66,10 +66,6 @@ function renderData(data) {
 
 window.displayResponse = displayResponse;
 window.renderData = renderData;
-document.getElementById('start-cycle').addEventListener('click', async () => {
-    const result = await window.pywebview.api.lancer_cycle();
-    if (!result.ok) document.getElementById('cycle-status').textContent = result.message;
-});
 window.addEventListener('pywebviewready', async () => {
     renderData(await window.pywebview.api.obtenir_donnees());
 });

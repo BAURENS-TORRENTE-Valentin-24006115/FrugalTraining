@@ -97,6 +97,7 @@ class FrugalInterface:
         self.reponse_ia_frugal = "En attente de l'évaluation..."
         self.reponse_ia_repondante = "En attente de la réponse du modèle..."
         self.status = "Prêt à lancer un cycle."
+        self.lancer_cycle()
         self._broadcast()
         return True
 
