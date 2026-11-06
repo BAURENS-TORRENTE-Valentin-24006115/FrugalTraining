@@ -99,6 +99,8 @@ class AI:
             "stream": True,
             "temperature": self.temperature if temperature is None else temperature,
         }
+        if self.provider == "deepseek":
+            payload["thinking"] = {"type": "disabled"}
         token_limit = self.max_tokens if max_tokens is None else max_tokens
         if token_limit is not None:
             payload["max_tokens"] = token_limit

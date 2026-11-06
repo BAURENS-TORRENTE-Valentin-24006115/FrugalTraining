@@ -36,7 +36,7 @@ body {
     text-align: center;
     line-height: 1.5;
     font-size: 3rem;
-    overflow-y: auto;
+    overflow: hidden;
     white-space: pre-wrap;
     word-break: break-word;
 }

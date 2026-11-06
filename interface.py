@@ -96,8 +96,9 @@ class FrugalInterface:
         self.selected_model_id = model_id
         self.reponse_ia_frugal = "En attente de l'évaluation..."
         self.reponse_ia_repondante = "En attente de la réponse du modèle..."
-        self.status = "Prêt à lancer un cycle."
-        self.lancer_cycle()
+        result = self.lancer_cycle()
+        if not result["ok"]:
+            self.status = result["message"]
         self._broadcast()
         return True
 
@@ -160,7 +161,7 @@ class FrugalInterface:
             self._record_cycle_score(value)
         elif event == "evaluation":
             self.push_frugal_ai_response(value)
-            match = re.search(r"Note\s*:\s*(\d{1,2})\s*/\s*20", value, re.I)
+            match = re.search(r"Note\s*:\s*(\d{1,3})\s*/\s*100", value, re.I)
             if match:
                 self._record_cycle_score(int(match.group(1)))
         elif event == "status":
@@ -173,7 +174,7 @@ class FrugalInterface:
         model = self._selected(self.models, self._active_model_id)
         if not model:
             return False
-        score = min(100, max(0, int(mark) * 5))
+        score = min(100, max(0, int(mark)))
         settings_manager.update_score(self.models_file, model["id"], score)
         self._score_recorded_for_cycle = True
         self.reload_settings()

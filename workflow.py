@@ -266,9 +266,9 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
         "Évalue la réponse avec ses valeurs, son vocabulaire et son point de vue, sans abandonner la tâche de notation :\n"
         f"{persona_prompt.strip()}\n\n"
         "Ta tâche est de noter la réponse d'une autre IA, pas de répondre à sa place. "
-        "Donne une note entière de 0 à 20. Réponds uniquement en français et en texte brut, sans Markdown, "
+        "Donne une note entière de 0 à 100. Réponds uniquement en français et en texte brut, sans Markdown, "
         "sans astérisques, titres, puces ni liste. Fais 2 ou 3 phrases et 80 mots maximum. "
-        "Commence exactement par « Note : X/20 » en remplaçant X par la note. "
+        "Commence exactement par « Note : X/100 » en remplaçant X par la note. "
         "Après la note, indique un point réussi puis un seul conseil concret, en restant dans le rôle. "
         "N'invente pas de citation religieuse ni de fait biographique. Ne donne ni grille de notation ni introduction. "
         "Termine par une phrase complète."
@@ -306,7 +306,7 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
                 final_chunk_count += 1
                 audio_queue.put_nowait(plain_text(fragment))
                 if not score_emitted:
-                    score_match = re.search(r"Note\s*:\s*(\d{1,2})\s*/\s*20", final_text, re.I)
+                    score_match = re.search(r"Note\s*:\s*(\d{1,3})\s*/\s*100", final_text, re.I)
                     if score_match:
                         emit("score", int(score_match.group(1)))
                         score_emitted = True
