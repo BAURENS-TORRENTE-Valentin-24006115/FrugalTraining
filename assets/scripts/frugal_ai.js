@@ -28,37 +28,37 @@ function renderData(data) {
     const roles = document.getElementById('roles-list');
     roles.replaceChildren();
     data.roles.forEach(role => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'persona-button';
-        button.disabled = data.running;
-        button.classList.toggle('is-selected', role.id === data.selected_role_id);
+        const p = document.createElement('p');
+        p.type = 'paragraph';
+        p.className = 'persona-ppargraph';
+        p.disabled = data.running;
+        p.classList.toggle('is-selected', role.id === data.selected_role_id);
         const image = document.createElement('img');
         image.src = role.icon || 'img/personnas/persona.svg';
         image.alt = '';
         const label = document.createElement('span');
         label.textContent = role.keybind ? `${role.name} [${role.keybind.toUpperCase()}]` : role.name;
-        button.append(image, label);
-        button.addEventListener('click', () => window.pywebview.api.select_role(role.id));
-        roles.appendChild(button);
+        p.append(image, label);
+        p.addEventListener('click', () => window.pywebview.api.select_role(role.id));
+        roles.appendChild(p);
     });
 
     const models = document.getElementById('models-list');
     models.replaceChildren();
     data.models.forEach(model => {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'model-button';
-        button.disabled = data.running;
-        button.classList.toggle('is-selected', model.id === data.selected_model_id);
+        const p = document.createElement('p');
+        p.type = 'paragraph';
+        p.className = 'model-paragraph';
+        p.disabled = data.running;
+        p.classList.toggle('is-selected', model.id === data.selected_model_id);
         const image = document.createElement('img');
         image.src = model.image || 'img/models/mistral.png';
         image.alt = '';
         const label = document.createElement('span');
         label.textContent = model.keybind ? `${model.name} [${model.keybind.toUpperCase()}]` : model.name;
-        button.append(image, label);
-        button.addEventListener('click', () => window.pywebview.api.select_model(model.id));
-        models.appendChild(button);
+        p.append(image, label);
+        p.addEventListener('click', () => window.pywebview.api.select_model(model.id));
+        models.appendChild(p);
     });
 }
 

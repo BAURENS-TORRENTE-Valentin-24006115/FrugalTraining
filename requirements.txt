@@ -1,3 +1,4 @@
+pywebview>=5.4
 edge-tts==7.3.1
 protobuf==7.36.1
 pygame-ce==2.5.8
