@@ -43,57 +43,56 @@ window.addEventListener('pywebviewready', function() {
         document.getElementById('role-header').innerText = `Role: ${data.current_role_name}`;
         displayResponse(data.reponse_ia_frugal, false);
 
-        // Build Chart
-        const chartGrid = document.getElementById('chart-grid');
-        const chartLabels = document.getElementById('chart-labels');
-        const averageScore = document.getElementById('average-score-text');
+        // // Build Chart
+        // const chartGrid = document.getElementById('chart-grid');
+        // const chartLabels = document.getElementById('chart-labels');
+        // const averageScore = document.getElementById('average-score-text');
 
-        if (averageScore) {
-            averageScore.innerText = data.average_score;
-        }
+        // if (averageScore) {
+        //     averageScore.innerText = data.average_score;
+        // }
 
-        if (chartGrid && chartLabels) {
-            chartGrid.innerHTML = '';
-            chartLabels.innerHTML = '';
+        // if (chartGrid && chartLabels) {
+        //     chartGrid.innerHTML = '';
+        //     chartLabels.innerHTML = '';
 
-            data.models.forEach(model => {
-                const bar = document.createElement('i');
-                bar.style.height = `${model.score}%`;
-                bar.title = `${model.name}: ${model.score}%`;
-                chartGrid.appendChild(bar);
+        //     data.models.forEach(model => {
+        //         const bar = document.createElement('i');
+        //         bar.style.height = `${model.score}%`;
+        //         bar.title = `${model.name}: ${model.score}%`;
+        //         chartGrid.appendChild(bar);
 
-                const label = document.createElement('span');
-                label.innerText = model.name;
-                chartLabels.appendChild(label);
-            });
-        }
+        //         const label = document.createElement('span');
+        //         label.innerText = model.name;
+        //         chartLabels.appendChild(label);
+        //     });
+        // }
 
         // Render Roles (Bottom Left)
         const rolesContainer = document.getElementById('roles-list');
         rolesContainer.innerHTML = '';
 
         data.roles.forEach(role => {
-            const button = document.createElement('button');
-            button.className = 'persona-button';
-            button.type = 'button';
-            button.innerHTML = `
-                <img src='${role.icon || 'img/persona.svg'}' alt=''>
-                <span>${role.name}</span>
+            const p = document.createElement('p');
+            p.className = 'persona-paragraph';
+            p.type = 'paragraph';
+            p.innerHTML = `
+                <span>| ${role.name} |</span>
             `;
 
             if (role.id === data.selected_role_id) {
-                button.classList.add('is-selected');
+                p.classList.add('is-selected');
             }
 
-            button.addEventListener('click', () => {
-                document.querySelectorAll('.persona-button').forEach(b => b.classList.remove('is-selected'));
-                button.classList.add('is-selected');
-                document.getElementById('role-icon').innerText = `Role: ${role.icon || 'img/persona.svg'}`;
-                document.getElementById('role-header').innerText = `Role: ${role.name}`;
-                window.pywebview.api.select_role(role.id);
-            });
+            // button.addEventListener('click', () => {
+            //     document.querySelectorAll('.persona-button').forEach(b => b.classList.remove('is-selected'));
+            //     button.classList.add('is-selected');
+            //     document.getElementById('role-icon').innerText = `Role: ${role.icon || 'img/persona.svg'}`;
+            //     document.getElementById('role-header').innerText = `Role: ${role.name}`;
+            //     window.pywebview.api.select_role(role.id);
+            // });
 
-            rolesContainer.appendChild(button);
+            rolesContainer.appendChild(p);
         });
 
         // Render Models (Bottom Right)
@@ -101,25 +100,24 @@ window.addEventListener('pywebviewready', function() {
         modelsContainer.innerHTML = '';
 
         data.models.forEach(model => {
-            const button = document.createElement('button');
-            button.className = 'model-button';
-            button.type = 'button';
-            button.innerHTML = `
-                <img src='${model.image}' alt=''>
-                <span>${model.name}</span>
+            const p = document.createElement('p');
+            p.className = 'model-paragraph';
+            p.type = 'paragraph';
+            p.innerHTML = `
+                <span>| ${model.name} |</span>
             `;
 
             if (model.id === data.selected_model_id) {
-                button.classList.add('is-selected');
+                p.classList.add('is-selected');
             }
 
-            button.addEventListener('click', () => {
-                document.querySelectorAll('.model-button').forEach(b => b.classList.remove('is-selected'));
-                button.classList.add('is-selected');
-                window.pywebview.api.select_model(model.id);
-            });
+            // button.addEventListener('click', () => {
+            //     document.querySelectorAll('.model-button').forEach(b => b.classList.remove('is-selected'));
+            //     button.classList.add('is-selected');
+            //     window.pywebview.api.select_model(model.id);
+            // });
 
-            modelsContainer.appendChild(button);
+            modelsContainer.appendChild(p);
         });
     });
 });
