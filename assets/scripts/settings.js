@@ -30,7 +30,8 @@ function renderList(kind, items) {
         image.alt = '';
         image.width = image.height = 32;
         const title = document.createElement('span');
-        title.textContent = `${item.name} (${item.id})${kind === 'models' ? ` — ${item.score}/100` : ''}`;
+        const keybindLabel = item.keybind ? ` — touche ${item.keybind.toUpperCase()}` : '';
+        title.textContent = `${item.name} (${item.id})${kind === 'models' ? ` — ${item.score}/100` : ''}${keybindLabel}`;
         info.append(image, title);
         const actions = document.createElement('div');
         const edit = document.createElement('button');
@@ -53,8 +54,9 @@ function editPersona(id) {
     const item = settingsData.personas.find(p => p.id === id);
     if (!item) return;
     for (const field of ['id', 'name', 'icon', 'persona']) {
-        document.getElementById(`p-${field}`).value = item[field];
+        document.getElementById(`p-${field}`).value = item[field] ?? '';
     }
+    document.getElementById('p-keybind').value = item.keybind || '';
 }
 
 function editModel(id) {
@@ -64,11 +66,13 @@ function editModel(id) {
         document.getElementById(`m-${field}`).value = item[field] ?? '';
     }
     document.getElementById('m-key').value = item.api_key || '';
+    document.getElementById('m-keybind').value = item.keybind || '';
 }
 
 async function savePersona() {
     const item = Object.fromEntries(['id', 'name', 'icon', 'persona'].map(field =>
         [field, document.getElementById(`p-${field}`).value.trim()]));
+    item.keybind = document.getElementById('p-keybind').value.trim().toLowerCase();
     try {
         await window.pywebview.api.save_persona(item);
         document.getElementById('form-persona').reset();
@@ -87,6 +91,7 @@ async function saveModel() {
         [field, document.getElementById(`m-${field}`).value.trim()]));
     item.api_key = document.getElementById('m-key').value.trim();
     item.score = Number(document.getElementById('m-score').value);
+    item.keybind = document.getElementById('m-keybind').value.trim().toLowerCase();
     try {
         await window.pywebview.api.save_model(item);
         document.getElementById('form-model').reset();

@@ -60,16 +60,19 @@ class FrugalInterface:
         self._emit_js(self._answering_window, "renderData", data)
 
     def obtenir_donnees(self):
-        safe_models = [{key: model.get(key) for key in ("id", "name", "image", "score")}
+        safe_models = [{key: model.get(key) for key in ("id", "name", "image", "score", "keybind")}
                        for model in self.models]
         scores = [model["score"] for model in safe_models if isinstance(model.get("score"), (int, float))]
         role = self._selected(self.roles, self.selected_role_id)
+        safe_roles = [{key: item.get(key) for key in ("id", "name", "icon", "keybind")}
+                      for item in self.roles]
         return {
-            "roles": [{key: item.get(key) for key in ("id", "name", "icon")} for item in self.roles],
+            "roles": safe_roles,
             "models": safe_models,
             "selected_role_id": self.selected_role_id,
             "selected_model_id": self.selected_model_id,
             "current_role_name": role["name"] if role else "",
+            "current_role_icon": role.get("icon", "") if role else "",
             "average_score": f"{round(sum(scores) / len(scores)) if scores else 0}/100",
             "reponse_ia_frugal": self.reponse_ia_frugal,
             "reponse_ia_repondante": self.reponse_ia_repondante,

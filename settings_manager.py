@@ -23,6 +23,18 @@ def read_items(path):
         data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, list):
         raise ValueError(f"Format invalide : {path}")
+    if path.name == "models.json":
+        defaults_path = ROOT / "assets/json/models.default.json"
+        if defaults_path.exists():
+            defaults = json.loads(defaults_path.read_text(encoding="utf-8"))
+            default_keybinds = {
+                item.get("id"): item.get("keybind")
+                for item in defaults
+                if isinstance(item, dict) and item.get("keybind")
+            }
+            for item in data:
+                if isinstance(item, dict) and not item.get("keybind"):
+                    item["keybind"] = default_keybinds.get(item.get("id"), "")
     return data
 
 
@@ -76,12 +88,17 @@ class SettingsManager:
             score = item.get("score", 0)
             if isinstance(score, bool) or not isinstance(score, int) or not 0 <= score <= 100:
                 raise ValueError("Score invalide.")
-            item = {k: item.get(k) for k in ("id", "name", "provider", "model", "base_url", "api_key", "image", "score")}
+            item = {k: item.get(k) for k in (
+                "id", "name", "provider", "model", "base_url", "api_key", "image", "score", "keybind"
+            )}
+            item["keybind"] = str(item.get("keybind") or "").strip().lower()
             if item["provider"] != "custom":
                 item["base_url"] = ""
             item["api_key"] = item["api_key"] or ""
         else:
+            keybind = str(item.get("keybind") or "").strip().lower()
             item = {k: item[k] for k in ("id", "name", "icon", "persona")}
+            item["keybind"] = keybind
         with _LOCK:
             data = read_items(path)
             index = next((i for i, existing in enumerate(data) if existing["id"] == item["id"]), None)

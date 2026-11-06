@@ -6,6 +6,8 @@ function displayResponse(text) {
 
 function renderData(data) {
     document.getElementById('role-header').textContent = `Rôle : ${data.current_role_name}`;
+    const personaImage = document.getElementById('persona-image');
+    if (personaImage) personaImage.src = data.current_role_icon || 'img/personnas/persona.svg';
     document.getElementById('average-score-text').textContent = data.average_score;
     document.getElementById('cycle-status').textContent = data.status;
     document.getElementById('start-cycle').disabled = data.running;
@@ -37,7 +39,7 @@ function renderData(data) {
         image.src = role.icon || 'img/personnas/persona.svg';
         image.alt = '';
         const label = document.createElement('span');
-        label.textContent = role.name;
+        label.textContent = role.keybind ? `${role.name} [${role.keybind.toUpperCase()}]` : role.name;
         button.append(image, label);
         button.addEventListener('click', () => window.pywebview.api.select_role(role.id));
         roles.appendChild(button);
@@ -55,7 +57,7 @@ function renderData(data) {
         image.src = model.image || 'img/models/mistral.png';
         image.alt = '';
         const label = document.createElement('span');
-        label.textContent = model.name;
+        label.textContent = model.keybind ? `${model.name} [${model.keybind.toUpperCase()}]` : model.name;
         button.append(image, label);
         button.addEventListener('click', () => window.pywebview.api.select_model(model.id));
         models.appendChild(button);
@@ -70,4 +72,31 @@ document.getElementById('start-cycle').addEventListener('click', async () => {
 });
 window.addEventListener('pywebviewready', async () => {
     renderData(await window.pywebview.api.obtenir_donnees());
+});
+
+document.addEventListener('keydown', async (event) => {
+    const activeElement = document.activeElement;
+    if (event.repeat || event.key.length !== 1 || activeElement?.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeElement?.tagName)) {
+        return;
+    }
+
+    try {
+        const data = await window.pywebview.api.obtenir_donnees();
+        const pressedKey = event.key.toLowerCase();
+        const model = data.models.find(item => item.keybind?.toLowerCase() === pressedKey);
+        if (model) {
+            event.preventDefault();
+            await window.pywebview.api.select_model(model.id);
+            return;
+        }
+
+        const role = data.roles.find(item => item.keybind?.toLowerCase() === pressedKey);
+        if (role) {
+            event.preventDefault();
+            await window.pywebview.api.select_role(role.id);
+        }
+    } catch (error) {
+        console.error('Erreur de sélection par raccourci :', error);
+    }
 });

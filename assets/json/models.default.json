@@ -1,5 +1,5 @@
 [
-  {"id": "mistral", "name": "Mistral", "provider": "mistral", "model": "open-mistral-nemo", "api_key": "", "image": "img/models/mistral.png", "score": 0},
-  {"id": "gemini", "name": "Gemini", "provider": "gemini", "model": "gemini-1.5-pro", "api_key": "", "image": "img/models/gemini.png", "score": 0},
-  {"id": "deepseek", "name": "DeepSeek", "provider": "deepseek", "model": "deepseek-chat", "api_key": "", "image": "img/models/deepseek.png", "score": 0}
+  {"id": "mistral", "name": "Mistral", "provider": "mistral", "model": "open-mistral-nemo", "api_key": "", "image": "img/models/mistral.png", "score": 0, "keybind": "1"},
+  {"id": "gemini", "name": "Gemini", "provider": "gemini", "model": "gemini-1.5-pro", "api_key": "", "image": "img/models/gemini.png", "score": 0, "keybind": "2"},
+  {"id": "deepseek", "name": "DeepSeek", "provider": "deepseek", "model": "deepseek-chat", "api_key": "", "image": "img/models/deepseek.png", "score": 0, "keybind": "3"}
 ]
