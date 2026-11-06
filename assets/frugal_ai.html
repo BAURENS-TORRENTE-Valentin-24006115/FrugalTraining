@@ -22,6 +22,11 @@
                 </div>
             </aside>
             <article class='response-panel'>
+                <div class="cycle-controls">
+                    <button id="start-cycle" type="button">Lancer un cycle</button>
+                    <button id="open-admin" type="button" onclick="afficherMotDePasse()">Administration</button>
+                    <span id="cycle-status" role="status"></span>
+                </div>
                 <p id='ai-answer'></p>
             </article>
         </section>
@@ -39,6 +44,7 @@
     <div class="admin-box">
         <h2>Accès admin</h2>
         <input type="password" id="admin-password">
+        <input type="password" id="admin-confirmation" placeholder="Confirmer le mot de passe" style="display:none">
         <p id="admin-message"></p>
         <button onclick="cacherMotDePasse()">Annuler</button>
         <button onclick="validerMotDePasse()">Valider</button>

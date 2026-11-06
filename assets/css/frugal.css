@@ -149,6 +149,11 @@ body {
 .response-panel p {
 	margin: 0 0 5px;
 }
+.cycle-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 14px; font-size: 13px; font-weight: 400; text-align: left; }
+#start-cycle { padding: 8px 12px; border: 0; border-radius: 5px; background: var(--blue); color: white; cursor: pointer; }
+#open-admin { padding: 8px 12px; border: 1px solid #777; border-radius: 5px; background: #333; color: white; cursor: pointer; }
+#start-cycle:disabled { opacity: .5; cursor: wait; }
+#cycle-status { color: #c9d8fa; }
 
 .bottom-panel {
 	display: grid;

@@ -61,7 +61,7 @@ body {
 /* Forms */
 form { background: #252525; padding: 20px; border-radius: 6px; display: flex; flex-direction: column; gap: 12px; }
 label { font-size: 12px; color: #aaa; }
-input, textarea {
+input, textarea, select {
     background: #181818;
     border: 1px solid #444;
     color: white;

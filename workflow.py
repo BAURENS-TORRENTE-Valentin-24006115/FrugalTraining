@@ -5,8 +5,7 @@ import os
 import time
 import asyncio
 import threading
-import queue
-import json
+import re
 import urllib.request
 import subprocess
 from pathlib import Path
@@ -28,6 +27,14 @@ def log_measurement(cycle_id: str, name: str, seconds: float, details: str = "")
     if details:
         line += f" | {details}"
     print(f"\n[METRIC] {line}", flush=True)
+
+
+def plain_text(text: str) -> str:
+    """Retire les marqueurs Markdown résiduels du texte destiné à l'écran et au TTS."""
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"(?m)^\s{0,3}(?:#{1,6}\s+|[-*]\s+)", "", text)
+    text = re.sub(r"(?<!\w)_([^_\n]+)_(?!\w)", r"\1", text)
+    return text.replace("*", "").replace("`", "")
 
 # Force UTF-8 stdout on Windows
 if sys.platform == "win32":
@@ -72,16 +79,17 @@ def start_ai_server() -> Optional[subprocess.Popen]:
     )
 
     print("[+] Attente de la disponibilité du serveur IA local...")
-    for _ in range(40):
+    for _ in range(200):
         if is_local_server_ready():
             print("\n[OK] Serveur IA local opérationnel !")
             return proc
+        if proc.poll() is not None:
+            raise RuntimeError("Le serveur IA local s'est arrêté pendant son démarrage.")
         sys.stdout.write(".")
         sys.stdout.flush()
         time.sleep(1.5)
 
-    print("\n[!] Attention : Le serveur n'a pas répondu dans le temps imparti. Poursuite de l'exécution...")
-    return proc
+    raise RuntimeError("Le serveur IA local n'a pas répondu dans les 5 minutes.")
 
 
 def load_questionnaire(pdf_path: Path) -> str:
@@ -133,8 +141,13 @@ async def sync_stream_to_async_gen(sync_gen) -> AsyncGenerator[str, None]:
         yield item
 
 
-async def run_cycle(env_values: dict[str, str]):
+async def run_cycle(env_values: dict[str, str], model_config: dict | None = None,
+                    persona_prompt: str = "", persona_name: str = "", event_callback=None):
     """Exécute un cycle complet d'évaluation."""
+    def emit(event, value):
+        if event_callback:
+            event_callback(event, value)
+
     cycle_started = time.perf_counter()
     cycle_id = time.strftime("%Y%m%d-%H%M%S")
 
@@ -144,7 +157,7 @@ async def run_cycle(env_values: dict[str, str]):
                     f"{len(questionnaire_text)} caractères")
     if not questionnaire_text:
         print("[!] Impossible de charger le questionnaire. Cycle interrompu.")
-        return
+        raise RuntimeError("Questionnaire introuvable ou illisible.")
 
     # Initial static text and TTS
     phrase_initiale = "Je peux te poser une question ?"
@@ -156,36 +169,24 @@ async def run_cycle(env_values: dict[str, str]):
         print(f"[!] Avertissement TTS statique : {e}")
     log_measurement(cycle_id, "tts_initiale", time.perf_counter() - stage_started)
 
-    # Start local model loading while the remote model is answering.
-    print("\n[+] Chargement de Ministral en parallèle de la génération distante...")
+    # The local service is started before the cycle; chat applies its system prompt.
     client_local = AI(provider="local")
-    local_slot_id = 0
-    prefill_prefix = (
-        "Tu es un évaluateur expert en sobriété numérique et en frugalisme. "
-        "La réponse candidate commence ci-dessous.\n"
-        "Réponse candidate :\n"
-    )
-    local_ready = threading.Event()
-    local_errors: list[Exception] = []
 
-    def load_local_model():
-        started = time.perf_counter()
-        try:
-            client_local.chat("Prépare-toi à recevoir la réponse candidate.", max_tokens=1)
-            log_measurement(cycle_id, "chargement_et_prewarm_ministral", time.perf_counter() - started)
-            local_ready.set()
-        except Exception as exc:
-            log_measurement(cycle_id, "chargement_ministral_echec", time.perf_counter() - started,
-                            str(exc))
-            local_errors.append(exc)
-            local_ready.set()
-
-    threading.Thread(target=load_local_model, daemon=True).start()
-
-    # Response from the remote AI
-    provider_distant = DISTANT_MODEL_PROVIDER if DISTANT_MODEL_PROVIDER else "mistral"
+    provider_distant = (model_config or {}).get("provider") or DISTANT_MODEL_PROVIDER
     print(f"\n[+] Instanciation de l'IA distante ({provider_distant.upper()})...")
-    client_distant = AI(provider=provider_distant, api_key=api_key_for(provider_distant, env_values))
+    client_distant = AI(
+        provider=provider_distant,
+        model=(model_config or {}).get("model"),
+        base_url=(model_config or {}).get("base_url"),
+        api_key=(model_config or {}).get("api_key") or api_key_for(provider_distant, env_values),
+    )
+    client_distant.system_prompt = (
+        f"{persona_prompt.strip()}\n\n"
+        "Réponds dans ce rôle au questionnaire. Utilise uniquement du texte brut : "
+        "aucun Markdown, aucune puce, aucun titre décoratif, aucun texte en gras ou en italique. "
+        "Garde les numéros des questions et réponds clairement en français."
+    )
+    emit("status", f"Réponse de {client_distant.model} en cours...")
 
     prompt_distant = (
         f"{phrase_initiale}\n\n"
@@ -196,211 +197,153 @@ async def run_cycle(env_values: dict[str, str]):
 
     print(f"[+] Envoi du questionnaire à l'IA distante ({client_distant.model})...")
     print("\n--- Réponse de l'IA Distante ---")
-    
+    remote_sound_task = None
+    sound_samples = []
+    try:
+        from dialogue_sound import load_sample_folder, play_generation_feedback
+        sample_path = Path(__file__).resolve().parent / "assets/audio/answering_ia_dialogue"
+        sound_samples = load_sample_folder(str(sample_path))
+        if sound_samples:
+            print(f"[TTS distant] Bibliothèque chargée : {len(sound_samples)} sons ; démarrage au premier fragment.")
+        else:
+            print("[!] Bibliothèque de sons distante vide ; sons de génération désactivés.")
+    except Exception as exc:
+        print(f"[!] Impossible de démarrer les sons de la réponse distante : {exc}")
+
+    async def stop_remote_sound():
+        if not remote_sound_task:
+            return
+        remote_sound_task.cancel()
+        try:
+            await remote_sound_task
+        except asyncio.CancelledError:
+            pass
+        except Exception as exc:
+            print(f"\n[!] Erreur à l'arrêt des sons distants : {exc}")
+
     reponse_distante = ""
-    pending = ""
-    # This keeps the first roughly half of the shorter questionnaire answer
-    # available for Ministral while the remote model is still generating.
-    chunk_size = 2300
     remote_started = time.perf_counter()
     remote_first_token_at = None
-    remote_finished_at = None
-    local_queue_drained_at = None
-    remote_token_count = 0
-    fragments_count = 0
-    merged_fragments_count = 0
-    fragment_processing_seconds = 0.0
-    cached_prompt_tokens = 0
-    newly_evaluated_tokens = 0
-    accumulated_local_text = ""
-    remote_queue: queue.Queue = queue.Queue()
-    local_queue: asyncio.Queue = asyncio.Queue()
-
-    def receive_remote_stream():
-        nonlocal remote_finished_at
-        try:
-            for token in client_distant.stream_chat(prompt_distant):
-                remote_queue.put(token)
-        except Exception as exc:
-            remote_queue.put(exc)
-        finally:
-            remote_finished_at = time.perf_counter()
-            remote_queue.put(None)
-
-    async def process_local_fragments():
-        nonlocal fragments_count, merged_fragments_count, fragment_processing_seconds
-        nonlocal cached_prompt_tokens, newly_evaluated_tokens, accumulated_local_text
-        while True:
-            fragment = await local_queue.get()
-            if fragment is None:
-                local_queue.task_done()
-                break
-            pending_fragments = [fragment]
-            saw_end = False
-            while True:
-                try:
-                    queued_fragment = local_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    break
-                if queued_fragment is None:
-                    local_queue.task_done()
-                    saw_end = True
-                    break
-                pending_fragments.append(queued_fragment)
-            try:
-                if not local_ready.is_set():
-                    await asyncio.to_thread(local_ready.wait)
-                if local_errors:
-                    raise local_errors[0]
-                merged_fragments_count += len(pending_fragments)
-                accumulated_local_text += "".join(pending_fragments)
-                payload = {
-                    "model": client_local.model,
-                    "prompt": prefill_prefix + accumulated_local_text,
-                    "n_predict": 0,
-                    "stream": False,
-                    "temperature": 0,
-                    "cache_prompt": True,
-                    "id_slot": local_slot_id,
-                    "timings_per_token": True,
-                }
-                request = urllib.request.Request(
-                    f"{client_local.base_url}/completions",
-                    data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-                    headers={"Content-Type": "application/json"},
-                )
-                fragment_started = time.perf_counter()
-                def prefill_request():
-                    with urllib.request.urlopen(request, timeout=300) as response:
-                        return json.load(response)
-                result = await asyncio.to_thread(prefill_request)
-                fragment_processing_seconds += time.perf_counter() - fragment_started
-                fragments_count += 1
-                timings = result.get("timings", {})
-                cached_prompt_tokens += int(timings.get("cache_n", 0))
-                newly_evaluated_tokens += int(timings.get("prompt_n", 0))
-            finally:
-                for _ in pending_fragments:
-                    local_queue.task_done()
-            if saw_end:
-                break
-
-    threading.Thread(target=receive_remote_stream, daemon=True).start()
-    local_worker = asyncio.create_task(process_local_fragments())
+    remote_chunk_count = 0
+    last_ui_update = 0.0
     try:
-        while True:
-            token = await asyncio.to_thread(remote_queue.get)
-            if token is None:
-                break
-            if isinstance(token, Exception):
-                raise token
+        async for token in sync_stream_to_async_gen(client_distant.stream_chat(prompt_distant)):
             if remote_first_token_at is None:
                 remote_first_token_at = time.perf_counter()
+                if sound_samples:
+                    remote_sound_task = asyncio.create_task(
+                        play_generation_feedback(sound_samples, interval=0.16)
+                    )
             print(token, end="", flush=True)
             reponse_distante += token
-            pending += token
-            remote_token_count += 1
-            # Queue coherent fragments while Ministral is loading; process in order once ready.
-            while len(pending) >= chunk_size:
-                split_at = max(pending.rfind(mark, 0, chunk_size + 1) for mark in (". ", "! ", "? ", "\n"))
-                if split_at < 0:
-                    split_at = chunk_size
-                else:
-                    split_at += 1
-                fragment, pending = pending[:split_at].strip(), pending[split_at:].lstrip()
-                if fragment:
-                    print("\n[+] Transmission d'un fragment à Ministral...")
-                    await local_queue.put(fragment)
-        if pending.strip():
-            await local_queue.put(pending.strip())
-        await local_queue.put(None)
-        await local_queue.join()
-        local_queue_drained_at = time.perf_counter()
-        await local_worker
-    except Exception as e:
-        if not local_worker.done():
-            local_worker.cancel()
-        print(f"\n[!] Erreur lors de la génération par l'IA distante : {e}")
-        log_measurement(cycle_id, "generation_distante_echec", time.perf_counter() - remote_started,
-                        str(e))
-        return
-
-    # Stop the remote timer when its producer finishes, excluding local queue drain time.
-    remote_total = (remote_finished_at or time.perf_counter()) - remote_started
+            remote_chunk_count += 1
+            if time.perf_counter() - last_ui_update >= 0.1:
+                emit("remote", reponse_distante)
+                last_ui_update = time.perf_counter()
+    except Exception as exc:
+        await stop_remote_sound()
+        log_measurement(cycle_id, "generation_distante_echec", time.perf_counter() - remote_started, str(exc))
+        raise RuntimeError(f"Génération distante échouée : {exc}") from exc
+    await stop_remote_sound()
+    emit("remote", reponse_distante)
     if remote_first_token_at is not None:
         log_measurement(cycle_id, "delai_premier_token_distant", remote_first_token_at - remote_started)
-    log_measurement(cycle_id, "generation_distante_totale", remote_total,
-                    f"{remote_token_count} morceaux de flux, {len(reponse_distante)} caractères")
-    log_measurement(cycle_id, "traitement_fragments_ministral", fragment_processing_seconds,
-                    f"{merged_fragments_count} fragments fusionnés en {fragments_count} préévaluations, "
-                    f"{newly_evaluated_tokens} nouveaux tokens, "
-                    f"{cached_prompt_tokens} tokens en cache, slot {local_slot_id}; "
-                    f"moyenne {fragment_processing_seconds / max(fragments_count, 1):.3f} s/appel")
-    if remote_finished_at is not None and local_queue_drained_at is not None:
-        post_api_wait = max(0.0, local_queue_drained_at - remote_finished_at)
-        log_measurement(cycle_id, "attente_apres_fin_api_pour_vider_file_ministral", post_api_wait)
-
+    log_measurement(cycle_id, "generation_distante_totale", time.perf_counter() - remote_started,
+                    f"{remote_chunk_count} morceaux de flux, {len(reponse_distante)} caractères")
     if not reponse_distante.strip():
         print("\n[!] L'IA distante n'a renvoyé aucun texte. Évaluation locale annulée.")
-        return
+        raise RuntimeError("Le modèle distant n'a renvoyé aucun texte.")
 
     print("\n--------------------------------")
 
-    # Extend the exact cached prompt and generate the assessment in the same llama.cpp slot.
-    print("\n[+] Ministral a assimilé la réponse. Génération de son évaluation finale...")
-    prompt_evaluation = (
-        prefill_prefix + accumulated_local_text +
-        "\n\nÉvalue la réponse candidate en français oral, sans puces ni markdown, en 2 ou 3 lignes et 50 mots maximum. "
-        "Commence obligatoirement par « Note : X/20 ». Puis donne un point réussi et un seul conseil clé d'amélioration. "
+    # Chat completions carries the persona as a real system message.
+    print("\n[+] Génération de l'évaluation de Ministral...")
+    emit("status", "Évaluation locale en cours...")
+    client_local.system_prompt = (
+        "Tu es un évaluateur de sobriété numérique et de frugalisme. "
+        f"Ton rôle pour cette évaluation est : {persona_name.strip() or 'Évaluateur'}. "
+        "Tu incarnes le persona suivant et tu t'adresses à la personne décrite dans ce rôle. "
+        "Évalue la réponse avec ses valeurs, son vocabulaire et son point de vue, sans abandonner la tâche de notation :\n"
+        f"{persona_prompt.strip()}\n\n"
+        "Ta tâche est de noter la réponse d'une autre IA, pas de répondre à sa place. "
+        "Donne une note entière de 0 à 20. Réponds uniquement en français et en texte brut, sans Markdown, "
+        "sans astérisques, titres, puces ni liste. Fais 2 ou 3 phrases et 80 mots maximum. "
+        "Commence exactement par « Note : X/20 » en remplaçant X par la note. "
+        "Après la note, indique un point réussi puis un seul conseil concret, en restant dans le rôle. "
+        "N'invente pas de citation religieuse ni de fait biographique. Ne donne ni grille de notation ni introduction. "
         "Termine par une phrase complète."
     )
+    client_local.temperature = 0.2
+    prompt_evaluation = f"Réponse de l'IA à évaluer :\n{reponse_distante}"
 
     print("\n[+] Évaluation de Ministral (Synthèse vocale TTS) :")
     final_started = time.perf_counter()
-    result_final = await asyncio.to_thread(
-        client_local.complete_completion,
-        prompt_evaluation,
-        240,
-        local_slot_id,
-        True,
-    )
-    final_text = "".join(choice.get("text", "") for choice in result_final.get("choices", []))
-    final_token_count = result_final.get("usage", {}).get("completion_tokens", 0)
+    final_text = ""
+    final_chunk_count = 0
+    last_evaluation_update = 0.0
+    score_emitted = False
+    tts_error = None
+
+    async def audio_stream(audio_queue):
+        while True:
+            fragment = await audio_queue.get()
+            if fragment is None:
+                break
+            yield fragment
+
+    async def generate_local_evaluation(prompt):
+        nonlocal final_text, final_chunk_count, last_evaluation_update, score_emitted, tts_error
+        final_text = ""
+        final_chunk_count = 0
+        score_emitted = False
+        audio_queue: asyncio.Queue = asyncio.Queue()
+        tts_task = asyncio.create_task(llm_stream_to_speech(audio_stream(audio_queue), TTS_VOICE))
+        try:
+            async for fragment in sync_stream_to_async_gen(
+                client_local.stream_chat(prompt, keep_history=False, max_tokens=768)
+            ):
+                final_text += fragment
+                final_chunk_count += 1
+                audio_queue.put_nowait(plain_text(fragment))
+                if not score_emitted:
+                    score_match = re.search(r"Note\s*:\s*(\d{1,2})\s*/\s*20", final_text, re.I)
+                    if score_match:
+                        emit("score", int(score_match.group(1)))
+                        score_emitted = True
+                if time.perf_counter() - last_evaluation_update >= 0.08:
+                    emit("evaluation_chunk", plain_text(final_text))
+                    last_evaluation_update = time.perf_counter()
+            emit("evaluation_chunk", plain_text(final_text))
+        finally:
+            audio_queue.put_nowait(None)
+        try:
+            await tts_task
+        except Exception as exc:
+            tts_error = exc
+            print(f"\n[!] Erreur TTS pendant l'évaluation : {exc}")
+
+    await generate_local_evaluation(prompt_evaluation)
     if not final_text.strip():
         log_measurement(cycle_id, "relance_evaluation_finale_apres_sortie_vide", 0.0)
-        result_final = await asyncio.to_thread(
-            client_local.complete_completion,
-            prompt_evaluation + "\n\nRéponds en 50 mots maximum et commence par « Note : ».",
-            240,
-            local_slot_id,
-            True,
+        await generate_local_evaluation(
+            prompt_evaluation + "\n\nRéponds maintenant, en commençant par « Note : »."
         )
-        final_text = "".join(choice.get("text", "") for choice in result_final.get("choices", []))
-        final_token_count = result_final.get("usage", {}).get("completion_tokens", 0)
     final_generation_seconds = time.perf_counter() - final_started
     if not final_text.strip():
         log_measurement(cycle_id, "generation_ministral_final_echec", final_generation_seconds,
                         "sortie vide après une relance")
         raise RuntimeError("Ministral a terminé sans texte d'évaluation après une relance.")
-
-    async def final_text_stream():
-        yield final_text
-
-    stream_eval = final_text_stream()
-
-    # Send the final generated evaluation to TTS.
-    try:
-        await llm_stream_to_speech(stream_eval, TTS_VOICE)
-    except Exception as e:
-        print(f"\n[!] Erreur lors de la lecture TTS de l'évaluation : {e}")
+    final_text = plain_text(final_text).strip()
+    emit("evaluation", final_text.strip())
 
     final_total = time.perf_counter() - final_started
     log_measurement(cycle_id, "generation_ministral_final", final_generation_seconds,
-                    f"{final_token_count} tokens de sortie")
+                    f"{final_chunk_count} fragments de sortie")
     log_measurement(cycle_id, "traitement_tts_evaluation_et_attente", max(0, final_total - final_generation_seconds))
     log_measurement(cycle_id, "duree_totale_cycle", time.perf_counter() - cycle_started)
     
     print("\n[+] Fin du cycle.")
+    emit("status", f"Cycle terminé. Audio indisponible : {tts_error}" if tts_error else "Cycle terminé.")
 
 
 async def main_async():

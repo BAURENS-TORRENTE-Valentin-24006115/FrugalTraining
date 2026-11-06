@@ -137,6 +137,27 @@ async def llm_stream_to_speech(stream, voice, rate="+5%", volume="+0%", pitch="+
     
     sentence_buffer = ""
     sentence_index = 0
+
+    def queue_complete_sentences(buffer):
+        """Queue every complete sentence in buffer and return the remainder."""
+        nonlocal sentence_index
+        # A model chunk can contain several sentences, or end midway through one.
+        # Split at punctuation followed by whitespace/end, preserving the final
+        # incomplete sentence for the next streamed fragment.
+        while True:
+            match = re.search(r"[.!?](?:[\"')\]]*)\s+|\n+", buffer)
+            if not match:
+                break
+            sentence = buffer[:match.end()].strip()
+            buffer = buffer[match.end():].lstrip()
+            clean_sentence = re.sub(r'[*#_~`]', '', sentence).strip()
+            if re.search(r'[a-zA-Z0-9À-ÿ]', clean_sentence):
+                task = asyncio.create_task(
+                    synthesize_sentence(clean_sentence, voice, sentence_index, audio_queue, rate, volume, pitch)
+                )
+                synthesis_tasks.append(task)
+                sentence_index += 1
+        return buffer
     
     stop_spinner = asyncio.Event()
     #spinner_task = asyncio.create_task(_spinner_worker(stop_spinner, "Ministral analyse les réponses..."))
@@ -152,19 +173,7 @@ async def llm_stream_to_speech(stream, voice, rate="+5%", volume="+0%", pitch="+
 
             print(token, end="", flush=True)
             sentence_buffer += token
-            
-            if re.search(r'[.!?\n]\s*$', sentence_buffer):
-                clean_sentence = re.sub(r'[*#_~`]', '', sentence_buffer).strip()
-                
-                # Ensure the string has playable characters to prevent crashes
-                if re.search(r'[a-zA-Z0-9À-ÿ]', clean_sentence):
-                    task = asyncio.create_task(
-                        synthesize_sentence(clean_sentence, voice, sentence_index, audio_queue, rate, volume, pitch)
-                    )
-                    synthesis_tasks.append(task)
-                    sentence_index += 1
-                    
-                sentence_buffer = ""
+            sentence_buffer = queue_complete_sentences(sentence_buffer)
     finally:
         if not stop_spinner.is_set():
             stop_spinner.set()

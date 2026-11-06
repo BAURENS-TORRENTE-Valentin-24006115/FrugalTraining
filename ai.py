@@ -48,7 +48,7 @@ class AI:
         max_tokens: int | None = None,
     ) -> None:
         provider = provider.lower()
-        if provider not in AI_ENDPOINTS:
+        if provider not in AI_ENDPOINTS and not base_url:
             raise ValueError(f"Fournisseur inconnu : {provider}")
 
         self.provider = provider
