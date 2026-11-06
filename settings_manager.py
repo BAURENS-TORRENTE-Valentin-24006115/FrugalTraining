@@ -3,6 +3,7 @@
 import json
 import re
 import threading
+import webview
 from pathlib import Path
 
 from settings import AI_ENDPOINTS

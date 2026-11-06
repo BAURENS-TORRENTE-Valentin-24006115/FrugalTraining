@@ -4,6 +4,7 @@ import asyncio
 import json
 import re
 import threading
+import webview
 from pathlib import Path
 
 import admin_auth
@@ -77,7 +78,7 @@ class FrugalInterface:
             "average_score": f"{round(sum(scores) / len(scores)) if scores else 0}/100",
             "reponse_ia_frugal": self.reponse_ia_frugal,
             "reponse_ia_repondante": self.reponse_ia_repondante,
-            "font_scale": self.style.get("font_scale", 100)
+            "font_scale": self.style.get("font_scale", 100),
             "status": self.status,
             "running": self._running,
         }
