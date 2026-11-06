@@ -6,10 +6,12 @@ Application à deux fenêtres : un modèle distant répond au questionnaire, pui
 
 ```powershell
 python -m pip install -r requirements.txt
+```
+Avant de lancer le projet un première fois, lancer `python admin_auth.py` pour definir votre mot de passe administrateur.
+```powershell
 python main.py
 ```
-
-Au premier lancement, ouvrez l'administration avec **Ctrl + Maj + A** et créez un mot de passe de huit caractères minimum. Le panneau permet de gérer les personas, les fournisseurs et les identifiants de modèles. Choisissez un modèle et un persona dans la fenêtre Frugal, puis cliquez sur **Lancer un cycle**. Les sélections sont bloquées pendant le cycle.
+Au premier lancement, ouvrez l'administration avec **Ctrl + Maj + A**. Le panneau permet de gérer les personas, les fournisseurs et les identifiants de modèles. Choisissez un modèle et un persona dans la fenêtre Frugal, puis cliquez sur une des **touches attibué**. Les sélections sont bloquées pendant le cycle.
 
 Les modèles proposés se trouvent dans `assets/json/models.default.json`. Les modifications et scores sont enregistrés dans `assets/json/models.json`, ignoré par Git. Vous pouvez ajouter un modèle via un endpoint compatible OpenAI (`/chat/completions`). Les clés API peuvent être saisies dans l'administration ou fournies dans `.env` avec `MISTRAL_API`, `GEMINI_API` et `DEEPSEEK_API`. Un modèle personnalisé demande sa propre clé dans l'administration. `admin_password.json` est également local et ignoré par Git.
 

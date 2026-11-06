@@ -9,8 +9,8 @@ function updateLogo(imageUrl) {
     document.getElementById('logo').src = imageUrl || 'img/models/mistral.png';
 }
 
-function fitTextToScreen() {
-    if (!responseBox.textContent.trim()) return;
+function fitTextToScreen(textBox = responseBox) {
+    if (!textBox.textContent.trim()) return;
 
     const MIN_FONT_SIZE = BASE_MIN_FONT_SIZE * fontScale / 100;
     const MAX_FONT_SIZE = BASE_MAX_FONT_SIZE * fontScale / 100;
@@ -22,10 +22,10 @@ function fitTextToScreen() {
     // Binary search to find the optimal font size that fits the container
     while (low <= high) {
         const mid = parseFloat(((low + high) / 2).toFixed(2));
-        responseBox.style.fontSize = mid + 'rem';
+        textBox.style.fontSize = mid + 'rem';
 
-        if (responseBox.scrollHeight <= responseBox.clientHeight && 
-            responseBox.scrollWidth <= responseBox.clientWidth) {
+        if (textBox.scrollHeight <= textBox.clientHeight && 
+            textBox.scrollWidth <= textBox.clientWidth) {
             bestSize = mid;
             low = mid + 0.1; // Try bigger
         } else {
@@ -33,13 +33,13 @@ function fitTextToScreen() {
         }
     }
 
-    responseBox.style.fontSize = bestSize + 'rem';
+    textBox.style.fontSize = bestSize + 'rem';
 
     // Fallback: If text overflows even at minimum font size, trim oldest words from the top
-    while (responseBox.scrollHeight > responseBox.clientHeight && responseBox.innerText.length > 0) {
-        const words = responseBox.innerText.split(' ');
+    while (textBox.scrollHeight > textBox.clientHeight && textBox.innerText.length > 0) {
+        const words = textBox.innerText.split(' ');
         words.shift(); 
-        responseBox.innerText = '...' + words.join(' ');
+        textBox.innerText = '...' + words.join(' ');
     }
 }
 

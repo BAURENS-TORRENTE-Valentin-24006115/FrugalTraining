@@ -29,7 +29,7 @@ body {
 }
 
 .top-panel {
-	display: grid;
+	display: column;
 	grid-template-columns: 150px 1fr;
 	min-height: 0;
 }
@@ -42,7 +42,7 @@ body {
 }
 
 .user-icon {
-	position: relative;
+	position: absolute;
 	flex: 0 0 52px;
 	width: 52px;
 	height: 58px;
@@ -86,14 +86,16 @@ body {
 }
 
 .response-panel {
-	display: grid;
-	place-items: center;
+	display: flex;
+	justify-content: center;
+	align-items: center;
 	min-width: 0;
 	padding: 60px clamp(24px, 9vw, 130px) 0;
+	margin-left: auto;
+  	margin-right: auto;
 }
 
 .response-panel p {
-	max-width: 780px;
 	margin: 0;
 	font-size: clamp(22px, 3.2vw, 40px);
 	line-height: 1.25;

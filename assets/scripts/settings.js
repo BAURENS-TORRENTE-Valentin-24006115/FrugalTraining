@@ -10,27 +10,9 @@ function switchTab(name, button) {
 function loadData() {
     window.pywebview.api.get_all_settings().then(data => {
         settingsData = data;
-        renderPersonas();
-        renderModels();
+        renderList('personas', data.personas);
+        renderList('models', data.models);
         loadStyle();
-    });
-}
-
-function renderPersonas() {
-    const list = document.getElementById('personas-container');
-    list.innerHTML = '';
-    settingsData.personas.forEach(p => {
-        list.innerHTML += `
-            <div class="item-card">
-                <div>
-                    <img src="${p.icon}" alt="${p.name}" width="32" height="32">
-                    <span><strong>${p.name}</strong> (${p.id})</span>
-                </div>
-                <div>
-                    <button class="btn-edit" onclick="editPersona('${p.id}')">Éditer</button>
-                    <button class="btn-delete" onclick="deletePersona('${p.id}')">Supprimer</button>
-                </div>
-            </div>`;
     });
 }
 

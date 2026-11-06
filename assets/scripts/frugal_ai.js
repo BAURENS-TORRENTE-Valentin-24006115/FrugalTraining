@@ -8,37 +8,36 @@ function renderData(data) {
     document.getElementById('role-header').textContent = `Rôle : ${data.current_role_name}`;
     const personaImage = document.getElementById('persona-image');
     if (personaImage) personaImage.src = data.current_role_icon || 'img/personnas/persona.svg';
-    document.getElementById('average-score-text').textContent = data.average_score;
     displayResponse(data.reponse_ia_frugal);
 
-    const chartGrid = document.getElementById('chart-grid');
-    const chartLabels = document.getElementById('chart-labels');
-    chartGrid.replaceChildren();
-    chartLabels.replaceChildren();
-    data.models.forEach(model => {
-        const bar = document.createElement('i');
-        bar.style.height = `${Math.max(0, Math.min(100, model.score || 0))}%`;
-        bar.title = `${model.name} : ${model.score || 0}/100`;
-        chartGrid.appendChild(bar);
-        const label = document.createElement('span');
-        label.textContent = model.name;
-        chartLabels.appendChild(label);
-    });
+    // const chartGrid = document.getElementById('chart-grid');
+    // const chartLabels = document.getElementById('chart-labels');
+    // chartGrid.replaceChildren();
+    // chartLabels.replaceChildren();
+    // data.models.forEach(model => {
+    //     const bar = document.createElement('i');
+    //     bar.style.height = `${Math.max(0, Math.min(100, model.score || 0))}%`;
+    //     bar.title = `${model.name} : ${model.score || 0}/100`;
+    //     chartGrid.appendChild(bar);
+    //     const label = document.createElement('span');
+    //     label.textContent = model.name;
+    //     chartLabels.appendChild(label);
+    // });
 
     const roles = document.getElementById('roles-list');
     roles.replaceChildren();
     data.roles.forEach(role => {
         const p = document.createElement('p');
         p.type = 'paragraph';
-        p.className = 'persona-ppargraph';
+        p.className = 'persona-paragraph';
         p.disabled = data.running;
         p.classList.toggle('is-selected', role.id === data.selected_role_id);
-        const image = document.createElement('img');
-        image.src = role.icon || 'img/personnas/persona.svg';
-        image.alt = '';
+        // const image = document.createElement('img');
+        // image.src = role.icon || 'img/personnas/persona.svg';
+        // image.alt = '';
         const label = document.createElement('span');
-        label.textContent = role.keybind ? `${role.name} [${role.keybind.toUpperCase()}]` : role.name;
-        p.append(image, label);
+        label.textContent = role.keybind ? `${role.name} [${role.keybind.toUpperCase()}]|` : role.name;
+        p.append(label);
         p.addEventListener('click', () => window.pywebview.api.select_role(role.id));
         roles.appendChild(p);
     });
@@ -51,12 +50,12 @@ function renderData(data) {
         p.className = 'model-paragraph';
         p.disabled = data.running;
         p.classList.toggle('is-selected', model.id === data.selected_model_id);
-        const image = document.createElement('img');
-        image.src = model.image || 'img/models/mistral.png';
-        image.alt = '';
+        // const image = document.createElement('img');
+        // image.src = model.image || 'img/models/mistral.png';
+        // image.alt = '';
         const label = document.createElement('span');
-        label.textContent = model.keybind ? `${model.name} [${model.keybind.toUpperCase()}]` : model.name;
-        p.append(image, label);
+        label.textContent = model.keybind ? `| ${model.name} [${model.keybind.toUpperCase()}]` : model.name;
+        p.append(label);
         p.addEventListener('click', () => window.pywebview.api.select_model(model.id));
         models.appendChild(p);
     });
