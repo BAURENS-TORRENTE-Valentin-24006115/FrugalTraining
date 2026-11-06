@@ -9,8 +9,6 @@ function renderData(data) {
     const personaImage = document.getElementById('persona-image');
     if (personaImage) personaImage.src = data.current_role_icon || 'img/personnas/persona.svg';
     document.getElementById('average-score-text').textContent = data.average_score;
-    document.getElementById('cycle-status').textContent = data.status;
-    document.getElementById('start-cycle').disabled = data.running;
     displayResponse(data.reponse_ia_frugal);
 
     const chartGrid = document.getElementById('chart-grid');
