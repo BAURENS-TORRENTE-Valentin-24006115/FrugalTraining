@@ -4,9 +4,12 @@ import os
 import webview
 
 class SettingsManager:
-    def __init__(self, models_file='assets/json/models.json', roles_file='assets/json/personas.json'):
+    def __init__(self, models_file='assets/json/models.json', roles_file='assets/json/personas.json',
+                 style_file='assets/json/style.json', on_style_change=None):
         self.models_file = models_file
         self.roles_file = roles_file
+        self.style_file = style_file
+        self._on_style_change = on_style_change
         self._window_settings = None
 
     def _read_json(self, filepath):
@@ -76,6 +79,21 @@ class SettingsManager:
         fenetre = self._window_settings or webview.active_window()
         if fenetre:
             fenetre.destroy()
+        return True
+
+    def get_style(self):
+        """Returns the saved style (font scale in %)."""
+        data = self._read_json(self.style_file)
+        if not isinstance(data, dict) or "font_scale" not in data:
+            return {"font_scale": 100}
+        return data
+
+    def save_style(self, style):
+        """Saves the style and applies it live on the answering AI window."""
+        scale = max(50, min(200, int(style.get("font_scale", 100))))
+        self._write_json(self.style_file, {"font_scale": scale})
+        if self._on_style_change:
+            self._on_style_change(scale)
         return True
 
 def launch_settings():

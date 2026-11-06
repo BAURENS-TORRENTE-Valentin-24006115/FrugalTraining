@@ -1,5 +1,7 @@
-const MIN_FONT_SIZE = 1.2; // Minimum readable font size (rem)
-const MAX_FONT_SIZE = 5.0; // Maximum font size for short text (rem)
+const BASE_MIN_FONT_SIZE = 1.2; // Minimum readable font size (rem)
+const BASE_MAX_FONT_SIZE = 5.0; // Maximum font size for short text (rem)
+let fontScale = 100; // Réglage depuis les paramètres (%)
+let lastText = '';
 let typingInterval = null;
 const responseBox = document.getElementById('ai-answer');
 
@@ -9,6 +11,9 @@ function updateLogo(imageUrl) {
 
 function fitTextToScreen() {
     if (!responseBox.textContent.trim()) return;
+
+    const MIN_FONT_SIZE = BASE_MIN_FONT_SIZE * fontScale / 100;
+    const MAX_FONT_SIZE = BASE_MAX_FONT_SIZE * fontScale / 100;
 
     let low = MIN_FONT_SIZE;
     let high = MAX_FONT_SIZE;
@@ -39,6 +44,7 @@ function fitTextToScreen() {
 }
 
 function displayResponse(text, progressive = true) {
+    lastText = text;
     clearInterval(typingInterval);
 
     if (!progressive) {
@@ -74,8 +80,19 @@ window.addEventListener('resize', fitTextToScreen);
 // Fetch initial data on load
 window.addEventListener('pywebviewready', function() {
     window.pywebview.api.obtenir_donnees().then(function(data) {
+        fontScale = data.font_scale || 100;
         const activeModel = data.models.find(m => m.id === data.selected_model_id);
         if (activeModel) updateLogo(activeModel.image);
         displayResponse(data.reponse_ia_repondante, true);
     });
 });
+
+// --- Taille de police réglable depuis les paramètres ---
+window.setFontScale = function (scale) {
+    fontScale = scale;
+    clearInterval(typingInterval);
+    if (lastText) {
+        responseBox.textContent = lastText;
+        fitTextToScreen();
+    }
+};

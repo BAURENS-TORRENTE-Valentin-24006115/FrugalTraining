@@ -13,6 +13,7 @@ class FrugalInterface:
 
         self.models = self._load_json(self.models_file, default=[])
         self.roles = self._load_json(self.roles_file, default=[])
+        self.style = self._load_json('assets/json/style.json', default={"font_scale": 100})
 
         self.selected_role = self.roles[0] if self.roles else None
         self.selected_model = self.models[0] if self.models else None
@@ -54,7 +55,8 @@ class FrugalInterface:
             "current_role_name": self.selected_role["name"] if self.selected_role else "",
             "average_score": f"{avg_score}/100",
             "reponse_ia_frugal": self.reponse_ia_frugal,
-            "reponse_ia_repondante": self.reponse_ia_repondante
+            "reponse_ia_repondante": self.reponse_ia_repondante,
+            "font_scale": self.style.get("font_scale", 100)
         }
 
     def select_role(self, role_id):
@@ -90,7 +92,7 @@ class FrugalInterface:
         """Ouvre la fenêtre des paramètres, uniquement si l'admin est connecté."""
         if not self._admin.est_connecte():
             return False
-        panel = settings_manager.SettingsManager()
+        panel = settings_manager.SettingsManager(on_style_change=self.appliquer_taille_police)
         webview.create_window(
             title="Configuration - IA Frugal",
             url="assets/settings.html",
@@ -99,6 +101,12 @@ class FrugalInterface:
             height=600
         )
         return True     
+
+    def appliquer_taille_police(self, scale):
+        """Applique la taille de police sur la fenêtre de l'IA répondante."""
+        self.style["font_scale"] = scale
+        if self._answering_window:
+            self._answering_window.evaluate_js(f"window.setFontScale({int(scale)})")
 
     # --- Methods for Python side ---
 

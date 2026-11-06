@@ -13,6 +13,7 @@ function loadData() {
         settingsData = data;
         renderPersonas();
         renderModels();
+        loadStyle();
     });
 }
 
@@ -140,6 +141,18 @@ function deleteModel(id) {
     if (confirm(`Voulez-vous vraiment supprimer l'IA '${id}' ?`)) {
         window.pywebview.api.delete_model(id).then(() => loadData());
     }
+}
+
+function loadStyle() {
+    window.pywebview.api.get_style().then(style => {
+        document.getElementById('s-font-scale').value = style.font_scale;
+        document.getElementById('font-scale-value').textContent = style.font_scale;
+    });
+}
+
+function saveStyle() {
+    const fontScale = parseInt(document.getElementById('s-font-scale').value, 10);
+    window.pywebview.api.save_style({ font_scale: fontScale });
 }
 
 window.addEventListener('pywebviewready', loadData);
