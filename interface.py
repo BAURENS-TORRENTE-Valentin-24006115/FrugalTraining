@@ -14,10 +14,10 @@ ROOT = Path(__file__).resolve().parent
 
 
 class FrugalInterface:
-    def __init__(self, models_file=None, roles_file=None, webview_module=None):
+    def __init__(self, models_file=None, roles_file=None, style_file=None, webview_module=None):
         self.models_file = Path(models_file or ROOT / "assets/json/models.json")
         self.roles_file = Path(roles_file or ROOT / "assets/json/personas.json")
-        self.style = self._load_json('assets/json/style.json', default={"font_scale": 100})
+        self.style_file = Path(style_file or ROOT / "assets/json/style.json")
         self.webview = webview_module
         self._admin = admin_auth.SessionAdmin()
         self._frugal_window = None
@@ -37,6 +37,7 @@ class FrugalInterface:
     def reload_settings(self):
         self.roles = settings_manager.read_items(self.roles_file)
         self.models = settings_manager.read_items(self.models_file)
+        self.style = settings_manager.read_json(self.style_file, default={"font_scale": 100})
         role_ids = {item["id"] for item in self.roles}
         model_ids = {item["id"] for item in self.models}
         if self.selected_role_id not in role_ids:
@@ -77,7 +78,7 @@ class FrugalInterface:
             "average_score": f"{round(sum(scores) / len(scores)) if scores else 0}/100",
             "reponse_ia_frugal": self.reponse_ia_frugal,
             "reponse_ia_repondante": self.reponse_ia_repondante,
-            "font_scale": self.style.get("font_scale", 100)
+            "font_scale": self.style.get("font_scale", 100),
             "status": self.status,
             "running": self._running,
         }
@@ -134,14 +135,20 @@ class FrugalInterface:
             return True
         panel = settings_manager.SettingsManager(
             self.models_file, self.roles_file,
-            is_admin=self.est_admin, on_change=self.reload_settings,
+            is_admin=self.est_admin, on_change=self.reload_settings, on_style_change=self.appliquer_taille_police
         )
         self._settings_window = self.webview.create_window(
             "Configuration - IA Frugal", str(ROOT / "assets/settings.html"),
             js_api=panel, width=900, height=650,
         )
         self._settings_window.events.closed += self._settings_closed
-        return True  
+        return True
+
+    def appliquer_taille_police(self, scale):
+        """Applique la taille de police sur la fenêtre de l'IA répondante."""
+        self.style["font_scale"] = scale
+        if self._answering_window:
+            self._answering_window.evaluate_js(f"window.setFontScale({int(scale)})")
 
     def apply_font_size(self, scale):
         """Applique la taille de police sur la fenêtre de l'IA répondante."""

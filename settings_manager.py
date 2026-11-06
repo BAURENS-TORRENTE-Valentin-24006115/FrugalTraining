@@ -3,6 +3,7 @@
 import json
 import re
 import threading
+import webview
 from pathlib import Path
 
 from settings import AI_ENDPOINTS
@@ -37,6 +38,14 @@ def read_items(path):
                     item["keybind"] = default_keybinds.get(item.get("id"), "")
     return data
 
+def read_json(path, default=None):
+    try:
+        with open(path) as f:
+            donnees = json.load(f)
+    except FileNotFoundError:
+        # aucun mot de passe encore creer        
+        return default
+    return donnees
 
 def write_items(path, data):
     path = Path(path)
@@ -54,9 +63,8 @@ def update_score(path, model_id, score):
                 break
         write_items(path, items)
 
-
 class SettingsManager:
-    def __init__(self, models_file=None, roles_file=None, is_admin=None, on_change=None):
+    def __init__(self, models_file=None, roles_file=None, style_file=None, is_admin=None, on_change=None, on_style_change=None):
         self.models_file = Path(models_file or ROOT / "assets/json/models.json")
         self.roles_file = Path(roles_file or ROOT / "assets/json/personas.json")
         self.style_file = Path(style_file or ROOT / "assets/json/style.json")
@@ -114,14 +122,18 @@ class SettingsManager:
 
     def return_exhibition(self):
         """Ferme la fenêtre des paramètres pour revenir sur l'exposition."""
-        fenetre = self._window_settings or webview.active_window()
+        fenetre = webview.active_window()
         if fenetre:
             fenetre.destroy()
         return True
 
     def get_style(self):
         """Returns the saved style (font scale in %)."""
-        data = self._read_json(self.style_file)
+        try:
+            data = json.loads(self.style_file.read_text(encoding="utf-8"))
+        except (FileNotFoundError, json.JSONDecodeError):
+            data = {}
+
         if not isinstance(data, dict) or "font_scale" not in data:
             return {"font_scale": 100}
         return data
@@ -129,7 +141,11 @@ class SettingsManager:
     def save_style(self, style):
         """Saves the style and applies it live on the answering AI window."""
         scale = max(50, min(200, int(style.get("font_scale", 100))))
-        self._write_json(self.style_file, {"font_scale": scale})
+
+        # Replaces self._write_json
+        self.style_file.parent.mkdir(parents=True, exist_ok=True)
+        self.style_file.write_text(json.dumps({"font_scale": scale}), encoding="utf-8")
+
         if self._on_style_change:
             self._on_style_change(scale)
         return True
@@ -145,9 +161,7 @@ class SettingsManager:
 
     def delete_model(self, item_id):
         return self._delete(self.models_file, item_id)
-  
-  def launch_settings():
-    settings_api = SettingsManager()
+
     def _delete(self, path, item_id):
         self._check()
         with _LOCK:
