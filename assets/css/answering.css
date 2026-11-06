@@ -32,9 +32,7 @@ body {
     height: 60vh;
     margin-top: 60px;
     padding: 30px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: block;
     text-align: center;
     line-height: 1.5;
     font-size: 3rem;

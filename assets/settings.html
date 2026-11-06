@@ -8,10 +8,8 @@
 <body>
 
     <div class="sidebar">
-        <button class="nav-btn">Style</button> 
-        <button class="nav-btn active" onclick="switchTab('personas')">Personnas</button>
-        <button class="nav-btn" onclick="switchTab('models')">IA</button>
-        <button class="nav-btn btn-retour" onclick="pywebview.api.revenir_exposition()">Revenir sur l'exposition</button>
+        <button class="nav-btn active" onclick="switchTab('personas', this)">Personas</button>
+        <button class="nav-btn" onclick="switchTab('models', this)">IA</button>
     </div>
 
     <div class="content">
@@ -57,9 +55,15 @@
                 
                 <label>Nom (ex: Gemini):</label>
                 <input type="text" id="m-name" required>
+                <label>Fournisseur:</label>
+                <select id="m-provider"><option value="mistral">Mistral</option><option value="gemini">Gemini</option><option value="deepseek">DeepSeek</option><option value="custom">Compatible OpenAI</option></select>
+                <label>Identifiant du modèle API:</label>
+                <input type="text" id="m-model" required>
+                <label>URL de base API (pour fournisseur personnalisé, jusqu'à /v1):</label>
+                <input type="url" id="m-base_url" placeholder="https://exemple.com/v1">
                 
-                <label>Clé API:</label>
-                <input type="password" id="m-key" required>
+                <label>Clé API (facultative si définie dans .env):</label>
+                <input type="password" id="m-key">
                 
                 <label>Image (chemin):</label>
                 <input type="text" id="m-image" value="img/models/gemini.png" required>

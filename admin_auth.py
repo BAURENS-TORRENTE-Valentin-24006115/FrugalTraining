@@ -4,8 +4,13 @@ import json
 import secrets
 import time
 from getpass import getpass
+from pathlib import Path
 
-FICHIER_MDP = "admin_password.json"
+FICHIER_MDP = Path(__file__).resolve().parent / "admin_password.json"
+
+
+def password_exists():
+    return FICHIER_MDP.is_file()
 
 ITERATIONS = 600000      # nombre de fois que le calcul est répété (valeur conseillée par l'OWASP)
 ESSAIS_MAX = 5           # nombre d'erreurs avant blocage
@@ -27,6 +32,19 @@ def enregistrer_mot_de_passe(mot_de_passe):
     sel = secrets.token_hex(16)
     with open(FICHIER_MDP, "w") as f:
         json.dump({"sel": sel, "hash": hasher(mot_de_passe, sel)}, f)
+
+
+def initialiser_mot_de_passe(mot_de_passe):
+    """Crée le premier mot de passe une seule fois, de façon atomique."""
+    if len(mot_de_passe) < 8:
+        return False
+    sel = secrets.token_hex(16)
+    try:
+        with open(FICHIER_MDP, "x", encoding="utf-8") as f:
+            json.dump({"sel": sel, "hash": hasher(mot_de_passe, sel)}, f)
+    except FileExistsError:
+        return False
+    return True
 
 
 def verifier_mot_de_passe(mot_de_passe):
