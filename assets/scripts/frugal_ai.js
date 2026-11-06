@@ -1,104 +1,96 @@
-let typingInterval = null;
+const responseBox = document.getElementById('ai-answer');
 
-function displayResponse(text, progressive = true) {
-    const responseBox = document.getElementById('ai-answer');
-    clearInterval(typingInterval);
+function displayResponse(text) {
+    responseBox.textContent = text || '';
+}
 
-    if (!progressive) {
-        responseBox.innerText = text;
+function renderData(data) {
+    document.getElementById('role-header').textContent = `Rôle : ${data.current_role_name}`;
+    const personaImage = document.getElementById('persona-image');
+    if (personaImage) personaImage.src = data.current_role_icon || 'img/personnas/persona.svg';
+    document.getElementById('average-score-text').textContent = data.average_score;
+    displayResponse(data.reponse_ia_frugal);
+
+    const chartGrid = document.getElementById('chart-grid');
+    const chartLabels = document.getElementById('chart-labels');
+    chartGrid.replaceChildren();
+    chartLabels.replaceChildren();
+    data.models.forEach(model => {
+        const bar = document.createElement('i');
+        bar.style.height = `${Math.max(0, Math.min(100, model.score || 0))}%`;
+        bar.title = `${model.name} : ${model.score || 0}/100`;
+        chartGrid.appendChild(bar);
+        const label = document.createElement('span');
+        label.textContent = model.name;
+        chartLabels.appendChild(label);
+    });
+
+    const roles = document.getElementById('roles-list');
+    roles.replaceChildren();
+    data.roles.forEach(role => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'persona-button';
+        button.disabled = data.running;
+        button.classList.toggle('is-selected', role.id === data.selected_role_id);
+        const image = document.createElement('img');
+        image.src = role.icon || 'img/personnas/persona.svg';
+        image.alt = '';
+        const label = document.createElement('span');
+        label.textContent = role.keybind ? `${role.name} [${role.keybind.toUpperCase()}]` : role.name;
+        button.append(image, label);
+        button.addEventListener('click', () => window.pywebview.api.select_role(role.id));
+        roles.appendChild(button);
+    });
+
+    const models = document.getElementById('models-list');
+    models.replaceChildren();
+    data.models.forEach(model => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'model-button';
+        button.disabled = data.running;
+        button.classList.toggle('is-selected', model.id === data.selected_model_id);
+        const image = document.createElement('img');
+        image.src = model.image || 'img/models/mistral.png';
+        image.alt = '';
+        const label = document.createElement('span');
+        label.textContent = model.keybind ? `${model.name} [${model.keybind.toUpperCase()}]` : model.name;
+        button.append(image, label);
+        button.addEventListener('click', () => window.pywebview.api.select_model(model.id));
+        models.appendChild(button);
+    });
+}
+
+window.displayResponse = displayResponse;
+window.renderData = renderData;
+window.addEventListener('pywebviewready', async () => {
+    renderData(await window.pywebview.api.obtenir_donnees());
+});
+
+document.addEventListener('keydown', async (event) => {
+    const activeElement = document.activeElement;
+    if (event.repeat || event.key.length !== 1 || activeElement?.isContentEditable ||
+        ['INPUT', 'TEXTAREA', 'SELECT'].includes(activeElement?.tagName)) {
         return;
     }
 
-    responseBox.innerText = '';
-    let index = 0;
-    typingInterval = setInterval(() => {
-        responseBox.innerText += text.charAt(index);
-        index++;
-        if (index >= text.length) {
-            clearInterval(typingInterval);
+    try {
+        const data = await window.pywebview.api.obtenir_donnees();
+        const pressedKey = event.key.toLowerCase();
+        const model = data.models.find(item => item.keybind?.toLowerCase() === pressedKey);
+        if (model) {
+            event.preventDefault();
+            await window.pywebview.api.select_model(model.id);
+            return;
         }
-    }, 25);
-}
 
-// Make accessible to Python evaluate_js
-window.displayResponse = displayResponse;
-
-window.addEventListener('pywebviewready', function() {
-    window.pywebview.api.obtenir_donnees().then(function(data) {
-
-        // 1. Initial Texts & Scores
-        document.getElementById('role-header').innerText = `Role: ${data.current_role_name}`;
-        document.getElementById('average-score-text').innerText = data.average_score;
-        displayResponse(data.reponse_ia_frugal, false);
-
-        // 2. Build Chart
-        const chartGrid = document.getElementById('chart-grid');
-        const chartLabels = document.getElementById('chart-labels');
-        chartGrid.innerHTML = '';
-        chartLabels.innerHTML = '';
-
-        data.models.forEach(model => {
-            const bar = document.createElement('i');
-            bar.style.height = `${model.score}%`;
-            bar.title = `${model.name}: ${model.score}%`;
-            chartGrid.appendChild(bar);
-
-            const label = document.createElement('span');
-            label.innerText = model.name;
-            chartLabels.appendChild(label);
-        });
-
-        // 3. Render Roles (Bottom Left)
-        const rolesContainer = document.getElementById('roles-list');
-        rolesContainer.innerHTML = '';
-
-        data.roles.forEach(role => {
-            const button = document.createElement('button');
-            button.className = 'persona-button';
-            button.type = 'button';
-            button.innerHTML = `
-                <img src='${role.icon || 'img/personnas/persona.svg'}' alt=''>
-                <span>${role.name}</span>
-            `;
-
-            if (role.id === data.selected_role_id) {
-                button.classList.add('is-selected');
-            }
-
-            button.addEventListener('click', () => {
-                document.querySelectorAll('.persona-button').forEach(b => b.classList.remove('is-selected'));
-                button.classList.add('is-selected');
-                document.getElementById('role-header').innerText = `Role: ${role.name}`;
-                window.pywebview.api.select_role(role.id);
-            });
-
-            rolesContainer.appendChild(button);
-        });
-
-        // 4. Render Models (Bottom Right)
-        const modelsContainer = document.getElementById('models-list');
-        modelsContainer.innerHTML = '';
-
-        data.models.forEach(model => {
-            const button = document.createElement('button');
-            button.className = 'model-button';
-            button.type = 'button';
-            button.innerHTML = `
-                <img src='${model.image}' alt=''>
-                <span>${model.name}</span>
-            `;
-
-            if (model.id === data.selected_model_id) {
-                button.classList.add('is-selected');
-            }
-
-            button.addEventListener('click', () => {
-                document.querySelectorAll('.model-button').forEach(b => b.classList.remove('is-selected'));
-                button.classList.add('is-selected');
-                window.pywebview.api.select_model(model.id);
-            });
-
-            modelsContainer.appendChild(button);
-        });
-    });
+        const role = data.roles.find(item => item.keybind?.toLowerCase() === pressedKey);
+        if (role) {
+            event.preventDefault();
+            await window.pywebview.api.select_role(role.id);
+        }
+    } catch (error) {
+        console.error('Erreur de sélection par raccourci :', error);
+    }
 });

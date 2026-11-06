@@ -44,6 +44,9 @@
                 
                 <label>Icône (chemin):</label>
                 <input type="text" id="p-icon" value="img/personnas/persona.svg" required>
+
+                <label>Touche de raccourci (Keybind):</label>
+                <input type="text" id="p-keybind" maxlength="1" required>
                 
                 <label>Persona (Prompt):</label>
                 <textarea id="p-persona" required></textarea>
@@ -67,12 +70,21 @@
                 
                 <label>Nom (ex: Gemini):</label>
                 <input type="text" id="m-name" required>
+                <label>Fournisseur:</label>
+                <select id="m-provider"><option value="mistral">Mistral</option><option value="gemini">Gemini</option><option value="deepseek">DeepSeek</option><option value="custom">Compatible OpenAI</option></select>
+                <label>Identifiant du modèle API:</label>
+                <input type="text" id="m-model" required>
+                <label>URL de base API (pour fournisseur personnalisé, jusqu'à /v1):</label>
+                <input type="url" id="m-base_url" placeholder="https://exemple.com/v1">
                 
-                <label>Clé API:</label>
-                <input type="password" id="m-key" required>
+                <label>Clé API (facultative si définie dans .env):</label>
+                <input type="password" id="m-key">
                 
                 <label>Image (chemin):</label>
                 <input type="text" id="m-image" value="img/models/gemini.png" required>
+
+                <label>Touche de raccourci (Keybind):</label>
+                <input type="text" id="m-keybind" maxlength="1" required>
                 
                 <label>Score (0-100):</label>
                 <input type="number" id="m-score" value="50" min="0" max="100" required>

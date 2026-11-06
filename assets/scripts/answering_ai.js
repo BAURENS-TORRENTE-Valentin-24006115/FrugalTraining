@@ -6,7 +6,7 @@ let typingInterval = null;
 const responseBox = document.getElementById('ai-answer');
 
 function updateLogo(imageUrl) {
-    document.getElementById('logo').src = imageUrl;
+    document.getElementById('logo').src = imageUrl || 'img/models/mistral.png';
 }
 
 function fitTextToScreen() {
@@ -43,39 +43,20 @@ function fitTextToScreen() {
     }
 }
 
-function displayResponse(text, progressive = true) {
-    lastText = text;
-    clearInterval(typingInterval);
-
-    if (!progressive) {
-        responseBox.textContent = text;
-        fitTextToScreen();
-        return;
-    }
-
-    responseBox.textContent = '';
-    let index = 0;
-
-    typingInterval = setInterval(() => {
-        // Use textContent instead of innerText to preserve trailing spaces
-        const char = text.charAt(index);
-        responseBox.textContent += char;
-        index++;
-
-        // Only adjust font scale on spaces/newlines or final character to prevent flickering
-        if (char === ' ' || char === '\n' || index >= text.length) {
-            fitTextToScreen();
-        }
-
-        if (index >= text.length) {
-            clearInterval(typingInterval);
-        }
-    }, 25);
+function displayResponse(text) {
+    responseBox.textContent = text || '';
+    fitTextToScreen();
 }
 
-// Expose functions to Python
+function renderData(data) {
+    const selected = data.models.find(model => model.id === data.selected_model_id);
+    updateLogo(selected && selected.image);
+    displayResponse(data.reponse_ia_repondante);
+}
+
 window.updateLogo = updateLogo;
 window.displayResponse = displayResponse;
+window.renderData = renderData;
 window.addEventListener('resize', fitTextToScreen);
 // Fetch initial data on load
 window.addEventListener('pywebviewready', function() {
@@ -96,3 +77,7 @@ window.setFontScale = function (scale) {
         fitTextToScreen();
     }
 };
+
+window.addEventListener('pywebviewready', async () => {
+    renderData(await window.pywebview.api.obtenir_donnees());
+});

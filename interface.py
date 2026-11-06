@@ -1,106 +1,147 @@
+"""Pont entre les fenêtres pywebview, la configuration et le workflow."""
+
+import asyncio
 import json
-import os
-import webview
-import tts
+import re
+import threading
+from pathlib import Path
+
 import admin_auth
 import settings_manager
+from settings import api_key_for, load_env_file
+
+ROOT = Path(__file__).resolve().parent
 
 
 class FrugalInterface:
-    def __init__(self, models_file='assets/json/models.json', roles_file='assets/json/personas.json'):
-        self.models_file = models_file
-        self.roles_file = roles_file
-
-        self.models = self._load_json(self.models_file, default=[])
-        self.roles = self._load_json(self.roles_file, default=[])
+    def __init__(self, models_file=None, roles_file=None, webview_module=None):
+        self.models_file = Path(models_file or ROOT / "assets/json/models.json")
+        self.roles_file = Path(roles_file or ROOT / "assets/json/personas.json")
         self.style = self._load_json('assets/json/style.json', default={"font_scale": 100})
-
-        self.selected_role = self.roles[0] if self.roles else None
-        self.selected_model = self.models[0] if self.models else None
-        self.reponse_ia_frugal = "En attente de la réponse de l'IA..."
-        self.reponse_ia_repondante = """Lorem ipsum dolor sit amet, consectetur adipiscing elit. Aliquam consequat non ante et accumsan. Interdum et malesuada fames ac ante ipsum primis in faucibus. Quisque placerat diam in orci consectetur, ac aliquet dolor placerat. Donec luctus gravida arcu, sed vestibulum urna placerat ut. Nullam vestibulum, eros tincidunt accumsan condimentum, dolor neque sodales diam, nec cursus mi massa ac elit. Integer et venenatis risus. Integer erat est, consectetur a interdum vulputate, interdum a lorem. Phasellus commodo, velit ac maximus elementum, massa nisl ultricies tellus, eget gravida nulla est ac tellus. Morbi a varius magna, laoreet bibendum nulla. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Nunc eget eleifend turpis, sit amet blandit sem. Etiam neque nisl, lacinia in tristique tempor, semper at ex. Sed non ipsum mollis elit gravida tempus eu at risus. Integer condimentum mattis bibendum. Sed tristique ex sed tristique cursus. Proin vestibulum tempor mattis. Pellentesque habitant morbi tristique senectus et netus et malesuada fames ac turpis egestas. Ut at congue tortor, eu laoreet tortor. Quisque vel ex et turpis tempus dignissim at hendrerit sem. Nam iaculis sed purus nec semper. Nam mattis accumsan massa ut luctus. Pellentesque pharetra pellentesque turpis, bibendum lacinia ligula dignissim quis. Suspendisse non tortor ut elit euismod dictum id quis orci. Duis aliquet dolor lectus, nec luctus erat volutpat at. Quisque lorem ante, consectetur ut felis eget, finibus condimentum mi. Pellentesque ac ipsum a diam condimentum congue eu et eros. Suspendisse luctus velit eu nulla bibendum viverra. Phasellus pharetra vulputate tellus, ut accumsan neque vulputate in. Donec elementum placerat aliquet. Etiam egestas justo quam, ut vulputate ligula mollis a. Maecenas fermentum nibh arcu, ac tincidunt mi pretium in. Nam faucibus felis sit amet scelerisque luctus. Sed fringilla viverra lobortis. Vestibulum lobortis vestibulum lacus, id suscipit turpis tempus nec. Pellentesque lacinia arcu sed dolor ultrices, eget ornare magna laoreet. Donec vitae porta arcu. In dignissim justo sodales arcu posuere semper. Mauris pharetra neque ac posuere consectetur. Maecenas tincidunt dolor at ligula tincidunt, sed lacinia risus facilisis. Vestibulum ultricies velit et purus varius, sed dictum urna ultrices. Maecenas commodo ultrices pretium. Cras a lacus diam. Suspendisse odio erat, dapibus sit amet auctor quis, laoreet ut elit. Praesent sapien neque, consectetur vitae nulla at, malesuada dictum nisl. Donec lobortis vitae purus eu aliquet. Quisque mauris ante, sodales eu vulputate id, ornare in mi. Class aptent taciti sociosqu ad litora torquent per conubia nostra, per inceptos himenaeos. Duis eget orci id urna malesuada vestibulum consectetur ac nisl. Sed vitae orci eget justo malesuada bibendum ac ultrices odio. Cras vitae eleifend odio. Suspendisse facilisis dictum rutrum. Sed molestie nulla justo, eu blandit sem rhoncus vitae. Nulla mollis, nibh at maximus lobortis, erat nisl viverra magna, nec sagittis libero lacus sit amet velit. Proin tortor libero, malesuada ac est id, vehicula pulvinar dolor. Nulla nunc elit, congue vel libero vitae, faucibus dignissim ex. Fusce ut elit vulputate, venenatis leo et, faucibus orci. Sed et pulvinar ante. Phasellus diam neque, convallis aliquam porta ut, tincidunt eget nisi. Pellentesque pulvinar purus ornare lacus interdum condimentum. Nunc vitae libero ipsum. Ut dui velit, feugiat ut felis ut, convallis venenatis magna. Integer sit amet enim cursus nibh pulvinar blandit. Suspendisse vitae sollicitudin lorem. Mauris et purus lectus. Praesent sed erat venenatis, consectetur nisl sed, consectetur diam. Nullam tortor est, rhoncus id posuere at, porta ut mauris. Proin sagittis fringilla viverra. Quisque eleifend diam eu purus feugiat, suscipit pellentesque libero dignissim. Sed dapibus ex a aliquet feugiat. Duis sagittis orci at erat molestie auctor. Quisque augue urna, mattis tincidunt luctus ac, tempus ac arcu. Sed sagittis dictum felis in mattis. Donec a ante tristique, viverra mi vel, rhoncus tortor. Pellentesque ullamcorper ornare augue, ut pharetra lorem placerat sed. Curabitur sed odio congue, sollicitudin lorem id, consequat lorem. Vivamus non pretium urna. Cras diam risus, vestibulum in diam mattis, placerat convallis dui. Sed feugiat imperdiet justo maximus sodales. Suspendisse volutpat velit purus, dictum molestie elit maximus at. Donec luctus justo ac magna cursus finibus nec et enim. Ut eleifend mi eu sem iaculis vestibulum. Nam fermentum auctor tristique. Maecenas id nisi quis urna consequat egestas at a mi. Etiam tempus lorem metus, non dignissim tellus tempus vel. Mauris condimentum nibh non dui lacinia vulputate. Praesent id arcu eu nisl consectetur pharetra ut non lectus. Fusce dictum efficitur massa ut faucibus. Quisque bibendum egestas sodales. Vivamus cursus molestie quam sed tempus. Interdum et malesuada fames ac ante ipsum primis in faucibus. Nulla facilisi. Sed ut dapibus nunc, ut dictum ligula."""
+        self.webview = webview_module
+        self._admin = admin_auth.SessionAdmin()
         self._frugal_window = None
         self._answering_window = None
-        self._admin = admin_auth.SessionAdmin()        
+        self._settings_window = None
+        self._cycle_lock = threading.Lock()
+        self._running = False
+        self._active_model_id = None
+        self._score_recorded_for_cycle = False
+        self.status = "Prêt à lancer un cycle."
+        self.reponse_ia_frugal = "En attente de l'évaluation..."
+        self.reponse_ia_repondante = "En attente de la réponse du modèle..."
+        self.selected_role_id = None
+        self.selected_model_id = None
+        self.reload_settings()
 
-    def _load_json(self, path, default):
-        if os.path.exists(path):
-            with open(path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        return default
+    def reload_settings(self):
+        self.roles = settings_manager.read_items(self.roles_file)
+        self.models = settings_manager.read_items(self.models_file)
+        role_ids = {item["id"] for item in self.roles}
+        model_ids = {item["id"] for item in self.models}
+        if self.selected_role_id not in role_ids:
+            self.selected_role_id = self.roles[0]["id"] if self.roles else None
+        if self.selected_model_id not in model_ids:
+            self.selected_model_id = self.models[0]["id"] if self.models else None
+        self._broadcast()
 
-    # --- Methods exposed to JavaScript ---
+    def _selected(self, items, item_id):
+        return next((item for item in items if item["id"] == item_id), None)
+
+    def _emit_js(self, window, function, *args):
+        if window is not None:
+            try:
+                window.evaluate_js(f"window.{function}({', '.join(json.dumps(a, ensure_ascii=False) for a in args)})")
+            except Exception as exc:
+                print(f"[UI] {function}: {exc}")
+
+    def _broadcast(self):
+        data = self.obtenir_donnees()
+        self._emit_js(self._frugal_window, "renderData", data)
+        self._emit_js(self._answering_window, "renderData", data)
 
     def obtenir_donnees(self):
-        """Returns public data to render the UI dynamically."""
-        # Calculate current average score
-        scores = [m.get('score', 0) for m in self.models if 'score' in m]
-        avg_score = round(sum(scores) / len(scores)) if scores else 0
-
-        safe_models = [
-            {
-                "id": m["id"],
-                "name": m["name"],
-                "image": m.get("image", "img/models/gemini.png"),
-                "score": m.get("score", 0)
-            }
-            for m in self.models
-        ]
-
+        safe_models = [{key: model.get(key) for key in ("id", "name", "image", "score", "keybind")}
+                       for model in self.models]
+        scores = [model["score"] for model in safe_models if isinstance(model.get("score"), (int, float))]
+        role = self._selected(self.roles, self.selected_role_id)
+        safe_roles = [{key: item.get(key) for key in ("id", "name", "icon", "keybind")}
+                      for item in self.roles]
         return {
-            "roles": self.roles,
+            "roles": safe_roles,
             "models": safe_models,
-            "selected_role_id": self.selected_role["id"] if self.selected_role else None,
-            "selected_model_id": self.selected_model["id"] if self.selected_model else None,
-            "current_role_name": self.selected_role["name"] if self.selected_role else "",
-            "average_score": f"{avg_score}/100",
+            "selected_role_id": self.selected_role_id,
+            "selected_model_id": self.selected_model_id,
+            "current_role_name": role["name"] if role else "",
+            "current_role_icon": role.get("icon", "") if role else "",
+            "average_score": f"{round(sum(scores) / len(scores)) if scores else 0}/100",
             "reponse_ia_frugal": self.reponse_ia_frugal,
             "reponse_ia_repondante": self.reponse_ia_repondante,
             "font_scale": self.style.get("font_scale", 100)
+            "status": self.status,
+            "running": self._running,
         }
 
     def select_role(self, role_id):
-        """Called from JS when a persona button is clicked."""
-        for role in self.roles:
-            if role["id"] == role_id:
-                self.selected_role = role
-                print(f"[Persona Selected] {role['name']} (Prompt: {role['persona']})")
-                break
+        if self._running or not self._selected(self.roles, role_id):
+            return False
+        self.selected_role_id = role_id
+        self.reponse_ia_frugal = "En attente de l'évaluation..."
+        self.reponse_ia_repondante = "En attente de la réponse du modèle..."
+        self.status = "Prêt à lancer un cycle."
+        self._broadcast()
+        return True
 
     def select_model(self, model_id):
-        """Called from JS when a model button is clicked."""
-        for model in self.models:
-            if model["id"] == model_id:
-                self.selected_model = model
-                print(f"[Model Selected] {model['name']}")
-                if self._answering_window:
-                    image_url = model.get("image", "")
-                    self._answering_window.evaluate_js(f"window.updateLogo('{image_url}')")
-                break
+        if self._running or not self._selected(self.models, model_id):
+            return False
+        self.selected_model_id = model_id
+        self.reponse_ia_frugal = "En attente de l'évaluation..."
+        self.reponse_ia_repondante = "En attente de la réponse du modèle..."
+        result = self.lancer_cycle()
+        if not result["ok"]:
+            self.status = result["message"]
+        self._broadcast()
+        return True
 
-    def verifier_mot_de_passe_admin(self, mot_de_passe):
-        """Appelée par admin.js quand on clique sur Valider. Renvoie "ok", "faux" ou "bloque"."""
-        return self._admin.connexion(mot_de_passe)
+    def verifier_mot_de_passe_admin(self, password):
+        return self._admin.connexion(password)
 
     def est_admin(self):
         return self._admin.est_connecte()
 
     def deconnecter_admin(self):
-        self._admin.deconnexion()   
+        self._admin.deconnexion()
+        if self._settings_window:
+            self._settings_window.destroy()
+            self._settings_window = None
+
+    def admin_configure(self):
+        return admin_auth.password_exists()
+
+    def initialiser_admin(self, password, confirmation):
+        if password != confirmation or len(password) < 8:
+            return False
+        if not admin_auth.initialiser_mot_de_passe(password):
+            return False
+        return self._admin.connexion(password) == "ok"
 
     def ouvrir_panel_admin(self):
-        """Ouvre la fenêtre des paramètres, uniquement si l'admin est connecté."""
-        if not self._admin.est_connecte():
+        if not self.est_admin():
             return False
-        panel = settings_manager.SettingsManager(on_style_change=self.apply_font_size)
-        webview.create_window(
-            title="Configuration - IA Frugal",
-            url="assets/settings.html",
-            js_api=panel,
-            width=900,
-            height=600
+        if self._settings_window:
+            self._settings_window.show()
+            return True
+        panel = settings_manager.SettingsManager(
+            self.models_file, self.roles_file,
+            is_admin=self.est_admin, on_change=self.reload_settings,
         )
-        return True     
+        self._settings_window = self.webview.create_window(
+            "Configuration - IA Frugal", str(ROOT / "assets/settings.html"),
+            js_api=panel, width=900, height=650,
+        )
+        self._settings_window.events.closed += self._settings_closed
+        return True  
 
     def apply_font_size(self, scale):
         """Applique la taille de police sur la fenêtre de l'IA répondante."""
@@ -114,54 +155,112 @@ class FrugalInterface:
         """Returns the prompt/persona of the currently selected role."""
         return self.selected_role["persona"] if self.selected_role else ""
 
-    def get_current_api_key(self):
-        """Returns the private API key for the currently selected model."""
-        return self.selected_model.get("api_key", "") if self.selected_model else ""
+    def _settings_closed(self, *args):
+        self._settings_window = None
 
-    def push_frugal_ai_response(self, text, progressive=True):
-        """Pushes a response from Python directly to the UI."""
+    def push_frugal_ai_response(self, text, progressive=False):
         self.reponse_ia_frugal = text
-        if self._frugal_window:
-            escaped_text = json.dumps(text)
-            # Appel à la fonction TTS
-            # tts.llm_stream_to_speech(text, "fr-CA-AntoineNeural")
-            self._frugal_window.evaluate_js(f"window.displayResponse({escaped_text}, {str(progressive).lower()})")
+        self._emit_js(self._frugal_window, "displayResponse", text, progressive)
 
-    def push_answering_ai_response(self, text, progressive=True):
-        """Pushes a response from Python directly to the UI."""
+    def push_answering_ai_response(self, text, progressive=False):
         self.reponse_ia_repondante = text
-        if self._answering_window:
-            escaped_text = json.dumps(text)
-            self._answering_window.evaluate_js(f"window.displayResponse({escaped_text}, {str(progressive).lower()})")
+        self._emit_js(self._answering_window, "displayResponse", text, progressive)
+
+    def _workflow_event(self, event, value):
+        if event == "remote":
+            self.push_answering_ai_response(value)
+        elif event == "evaluation_chunk":
+            self.push_frugal_ai_response(value, progressive=False)
+        elif event == "score":
+            self._record_cycle_score(value)
+        elif event == "evaluation":
+            self.push_frugal_ai_response(value)
+            match = re.search(r"Note\s*:\s*(\d{1,3})\s*/\s*100", value, re.I)
+            if match:
+                self._record_cycle_score(int(match.group(1)))
+        elif event == "status":
+            self.status = value
+            self._broadcast()
+
+    def _record_cycle_score(self, mark):
+        if self._score_recorded_for_cycle or self._active_model_id is None:
+            return False
+        model = self._selected(self.models, self._active_model_id)
+        if not model:
+            return False
+        score = min(100, max(0, int(mark)))
+        settings_manager.update_score(self.models_file, model["id"], score)
+        self._score_recorded_for_cycle = True
+        self.reload_settings()
+        return True
+
+    def lancer_cycle(self):
+        with self._cycle_lock:
+            if self._running:
+                return {"ok": False, "message": "Un cycle est déjà en cours."}
+            model = self._selected(self.models, self.selected_model_id)
+            role = self._selected(self.roles, self.selected_role_id)
+            if not model or not role:
+                return {"ok": False, "message": "Ajoutez un modèle et un persona dans l'administration."}
+            provider = model.get("provider") or model["id"]
+            key = model.get("api_key") or api_key_for(provider, load_env_file())
+            if not key:
+                return {"ok": False, "message": f"Clé API manquante pour {model['name']}."}
+            self._running = True
+            self._active_model_id = model["id"]
+            self._score_recorded_for_cycle = False
+            self.status = "Démarrage du cycle..."
+            self.push_frugal_ai_response("En attente de l'évaluation...")
+            self.push_answering_ai_response("En attente de la réponse du modèle...")
+            self._broadcast()
+
+        def worker():
+            try:
+                from workflow import run_cycle, start_ai_server
+                self._workflow_event("status", "Démarrage du serveur local...")
+                start_ai_server()
+                asyncio.run(run_cycle(
+                    load_env_file(), model_config=model, persona_prompt=role["persona"],
+                    persona_name=role["name"],
+                    event_callback=self._workflow_event,
+                ))
+            except Exception as exc:
+                self._workflow_event("status", f"Erreur : {exc}")
+            finally:
+                with self._cycle_lock:
+                    self._running = False
+                    self._active_model_id = None
+                self._broadcast()
+
+        threading.Thread(target=worker, daemon=True).start()
+        return {"ok": True, "message": self.status}
 
 
 def launch_windows(http_server=False, debug=False):
-    monitors = webview.screens
-    print(f"[INFO] Detected {len(monitors)} monitor(s): {monitors}")
-    if len(monitors) < 2:
-        print("[WARNING] Less than 2 monitors detected. Both windows will open on the primary monitor.")
-        monitors = [monitors[0], monitors[0]]
-    screen_for_ai_1 = monitors[0]
-    screen_for_ai_2 = monitors[1]
+    import webview
 
-    interface = FrugalInterface()
+    interface = FrugalInterface(webview_module=webview)
+    screens = list(webview.screens)
+    first = screens[0] if screens else None
+    second = screens[1] if len(screens) > 1 else first
+    two_screens = len(screens) > 1
+    window_options = {"fullscreen": two_screens}
+    if first and not two_screens:
+        half_width = max(500, first.width // 2)
+        window_options.update(width=half_width, height=max(500, first.height - 80))
     interface._frugal_window = webview.create_window(
-        title="IA Frugal",
-        url="assets/frugal_ai.html",
-        js_api=interface,
-        screen=screen_for_ai_1,
-        fullscreen=True
+        "IA Frugal", str(ROOT / "assets/frugal_ai.html"),
+        js_api=interface, screen=first, x=first.x if first and not two_screens else None,
+        y=first.y if first and not two_screens else None, **window_options,
     )
     interface._answering_window = webview.create_window(
-        title="IA Repondante",
-        url="assets/answering_ai.html",
-        js_api=interface,
-        screen=screen_for_ai_2,
-        fullscreen=True
+        "IA Répondante", str(ROOT / "assets/answering_ai.html"),
+        js_api=interface, screen=second,
+        x=first.x + half_width if first and not two_screens else None,
+        y=first.y if first and not two_screens else None, **window_options,
     )
-
     webview.start(http_server=http_server, debug=debug)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     launch_windows()

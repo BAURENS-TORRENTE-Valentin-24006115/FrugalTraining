@@ -1,11 +1,10 @@
 let settingsData = { personas: [], models: [] };
 
-function switchTab(tabName) {
-    document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-    
-    document.getElementById(`tab-${tabName}`).classList.add('active');
-    event.target.classList.add('active');
+function switchTab(name, button) {
+    document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(item => item.classList.remove('active'));
+    document.getElementById(`tab-${name}`).classList.add('active');
+    button.classList.add('active');
 }
 
 function loadData() {
@@ -35,112 +34,91 @@ function renderPersonas() {
     });
 }
 
-function renderModels() {
-    const list = document.getElementById('models-container');
-    list.innerHTML = '';
-    settingsData.models.forEach(m => {
-        list.innerHTML += `
-            <div class="item-card">
-                <div>
-                    <img src="${m.image}" alt="${m.name}" width="32" height="32">
-                    <span><strong>${m.name}</strong> (${m.id}) - Score: ${m.score}</span>
-                </div>
-                <div>
-                    <button class="btn-edit" onclick="editModel('${m.id}')">Éditer</button>
-                    <button class="btn-delete" onclick="deleteModel('${m.id}')">Supprimer</button>
-                </div>
-            </div>`;
+function renderList(kind, items) {
+    const list = document.getElementById(`${kind}-container`);
+    list.replaceChildren();
+    items.forEach(item => {
+        const card = document.createElement('div');
+        card.className = 'item-card';
+        const info = document.createElement('div');
+        const image = document.createElement('img');
+        image.src = kind === 'models' ? item.image : item.icon;
+        image.alt = '';
+        image.width = image.height = 32;
+        const title = document.createElement('span');
+        const keybindLabel = item.keybind ? ` — touche ${item.keybind.toUpperCase()}` : '';
+        title.textContent = `${item.name} (${item.id})${kind === 'models' ? ` — ${item.score}/100` : ''}${keybindLabel}`;
+        info.append(image, title);
+        const actions = document.createElement('div');
+        const edit = document.createElement('button');
+        edit.type = 'button';
+        edit.className = 'btn-edit';
+        edit.textContent = 'Éditer';
+        edit.addEventListener('click', () => kind === 'models' ? editModel(item.id) : editPersona(item.id));
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'btn-delete';
+        remove.textContent = 'Supprimer';
+        remove.addEventListener('click', () => kind === 'models' ? deleteModel(item.id) : deletePersona(item.id));
+        actions.append(edit, remove);
+        card.append(info, actions);
+        list.appendChild(card);
     });
 }
 
 function editPersona(id) {
-    const p = settingsData.personas.find(x => x.id === id);
-    if (!p) return;
-    document.getElementById('p-id').value = p.id;
-    document.getElementById('p-name').value = p.name;
-    document.getElementById('p-icon').value = p.icon || '';
-    document.getElementById('p-persona').value = p.persona;
-}
-
-function savePersona() {
-    const id = document.getElementById('p-id').value.trim().toLowerCase();
-    const name = document.getElementById('p-name').value.trim();
-    const icon = document.getElementById('p-icon').value.trim();
-    const persona = document.getElementById('p-persona').value.trim();
-
-    // Verify non-empty fields
-    if (!id || !name || !icon || !persona) {
-        alert("Tous les champs sont obligatoires.");
-        return;
+    const item = settingsData.personas.find(p => p.id === id);
+    if (!item) return;
+    for (const field of ['id', 'name', 'icon', 'persona']) {
+        document.getElementById(`p-${field}`).value = item[field] ?? '';
     }
-
-    // Verify lower-case only format for ID
-    if (!/^[a-z0-9_-]+$/.test(id)) {
-        alert("L'ID doit être écrit uniquement en minuscules (sans espaces ni accents).");
-        return;
-    }
-
-    const item = { id, name, icon, persona };
-
-    window.pywebview.api.save_persona(item).then(() => {
-        loadData();
-        document.getElementById('form-persona').reset();
-    });
-}
-
-function deletePersona(id) {
-    if (confirm(`Voulez-vous vraiment supprimer le persona '${id}' ?`)) {
-        window.pywebview.api.delete_persona(id).then(() => loadData());
-    }
+    document.getElementById('p-keybind').value = item.keybind || '';
 }
 
 function editModel(id) {
-    const m = settingsData.models.find(x => x.id === id);
-    if (!m) return;
-    document.getElementById('m-id').value = m.id;
-    document.getElementById('m-name').value = m.name;
-    document.getElementById('m-key').value = m.api_key || '';
-    document.getElementById('m-image').value = m.image || '';
-    document.getElementById('m-score').value = m.score !== undefined ? m.score : 50;
+    const item = settingsData.models.find(m => m.id === id);
+    if (!item) return;
+    for (const field of ['id', 'name', 'provider', 'model', 'base_url', 'image', 'score']) {
+        document.getElementById(`m-${field}`).value = item[field] ?? '';
+    }
+    document.getElementById('m-key').value = item.api_key || '';
+    document.getElementById('m-keybind').value = item.keybind || '';
 }
 
-function saveModel() {
-    const id = document.getElementById('m-id').value.trim().toLowerCase();
-    const name = document.getElementById('m-name').value.trim();
-    const apiKey = document.getElementById('m-key').value.trim();
-    const image = document.getElementById('m-image').value.trim();
-    const scoreVal = document.getElementById('m-score').value.trim();
+async function savePersona() {
+    const item = Object.fromEntries(['id', 'name', 'icon', 'persona'].map(field =>
+        [field, document.getElementById(`p-${field}`).value.trim()]));
+    item.keybind = document.getElementById('p-keybind').value.trim().toLowerCase();
+    try {
+        await window.pywebview.api.save_persona(item);
+        document.getElementById('form-persona').reset();
+        await loadData();
+    } catch (error) { alert(String(error)); }
+}
 
-    // Verify non-empty fields
-    if (!id || !name || !apiKey || !image || scoreVal === '') {
-        alert("Tous les champs (y compris la clé API et le score) sont obligatoires.");
-        return;
-    }
+async function deletePersona(id) {
+    if (!confirm(`Supprimer le persona « ${id} » ?`)) return;
+    try { await window.pywebview.api.delete_persona(id); await loadData(); }
+    catch (error) { alert(String(error)); }
+}
 
-    // Verify lower-case only format for ID
-    if (!/^[a-z0-9_-]+$/.test(id)) {
-        alert("L'ID doit être écrit uniquement en minuscules (sans espaces ni accents).");
-        return;
-    }
-
-    const score = parseInt(scoreVal, 10);
-    if (isNaN(score) || score < 0 || score > 100) {
-        alert("Le score doit être un nombre valide entre 0 et 100.");
-        return;
-    }
-
-    const item = { id, name, api_key: apiKey, image, score };
-
-    window.pywebview.api.save_model(item).then(() => {
-        loadData();
+async function saveModel() {
+    const item = Object.fromEntries(['id', 'name', 'provider', 'model', 'base_url', 'image'].map(field =>
+        [field, document.getElementById(`m-${field}`).value.trim()]));
+    item.api_key = document.getElementById('m-key').value.trim();
+    item.score = Number(document.getElementById('m-score').value);
+    item.keybind = document.getElementById('m-keybind').value.trim().toLowerCase();
+    try {
+        await window.pywebview.api.save_model(item);
         document.getElementById('form-model').reset();
-    });
+        await loadData();
+    } catch (error) { alert(String(error)); }
 }
 
-function deleteModel(id) {
-    if (confirm(`Voulez-vous vraiment supprimer l'IA '${id}' ?`)) {
-        window.pywebview.api.delete_model(id).then(() => loadData());
-    }
+async function deleteModel(id) {
+    if (!confirm(`Supprimer le modèle « ${id} » ?`)) return;
+    try { await window.pywebview.api.delete_model(id); await loadData(); }
+    catch (error) { alert(String(error)); }
 }
 
 function loadStyle() {
