@@ -75,3 +75,4 @@ textarea { height: 160px; resize: vertical; }
 .btn-save { background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
 .btn-edit { background: #ffc107; color: black; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
 .btn-delete { background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+.btn-retour { position: fixed; bottom: 16px; left: 16px; background-color: #c62828; color: #ffffff; }

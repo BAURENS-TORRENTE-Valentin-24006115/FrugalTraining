@@ -7,15 +7,31 @@ function switchTab(name, button) {
     button.classList.add('active');
 }
 
-async function loadData() {
-    try {
-        settingsData = await window.pywebview.api.get_all_settings();
-        renderList('personas', settingsData.personas);
-        renderList('models', settingsData.models);
-    } catch (error) {
-        alert(`Session administrateur expirée : ${error}`);
-        window.close();
-    }
+function loadData() {
+    window.pywebview.api.get_all_settings().then(data => {
+        settingsData = data;
+        renderPersonas();
+        renderModels();
+        loadStyle();
+    });
+}
+
+function renderPersonas() {
+    const list = document.getElementById('personas-container');
+    list.innerHTML = '';
+    settingsData.personas.forEach(p => {
+        list.innerHTML += `
+            <div class="item-card">
+                <div>
+                    <img src="${p.icon}" alt="${p.name}" width="32" height="32">
+                    <span><strong>${p.name}</strong> (${p.id})</span>
+                </div>
+                <div>
+                    <button class="btn-edit" onclick="editPersona('${p.id}')">Éditer</button>
+                    <button class="btn-delete" onclick="deletePersona('${p.id}')">Supprimer</button>
+                </div>
+            </div>`;
+    });
 }
 
 function renderList(kind, items) {
@@ -103,6 +119,18 @@ async function deleteModel(id) {
     if (!confirm(`Supprimer le modèle « ${id} » ?`)) return;
     try { await window.pywebview.api.delete_model(id); await loadData(); }
     catch (error) { alert(String(error)); }
+}
+
+function loadStyle() {
+    window.pywebview.api.get_style().then(style => {
+        document.getElementById('s-font-scale').value = style.font_scale;
+        document.getElementById('font-scale-value').textContent = style.font_scale;
+    });
+}
+
+function saveStyle() {
+    const fontScale = parseInt(document.getElementById('s-font-scale').value, 10);
+    window.pywebview.api.save_style({ font_scale: fontScale });
 }
 
 window.addEventListener('pywebviewready', loadData);

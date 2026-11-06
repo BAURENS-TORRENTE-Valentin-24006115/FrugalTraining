@@ -17,6 +17,7 @@ class FrugalInterface:
     def __init__(self, models_file=None, roles_file=None, webview_module=None):
         self.models_file = Path(models_file or ROOT / "assets/json/models.json")
         self.roles_file = Path(roles_file or ROOT / "assets/json/personas.json")
+        self.style = self._load_json('assets/json/style.json', default={"font_scale": 100})
         self.webview = webview_module
         self._admin = admin_auth.SessionAdmin()
         self._frugal_window = None
@@ -76,6 +77,7 @@ class FrugalInterface:
             "average_score": f"{round(sum(scores) / len(scores)) if scores else 0}/100",
             "reponse_ia_frugal": self.reponse_ia_frugal,
             "reponse_ia_repondante": self.reponse_ia_repondante,
+            "font_scale": self.style.get("font_scale", 100)
             "status": self.status,
             "running": self._running,
         }
@@ -139,7 +141,19 @@ class FrugalInterface:
             js_api=panel, width=900, height=650,
         )
         self._settings_window.events.closed += self._settings_closed
-        return True
+        return True  
+
+    def apply_font_size(self, scale):
+        """Applique la taille de police sur la fenêtre de l'IA répondante."""
+        self.style["font_scale"] = scale
+        if self._answering_window:
+            self._answering_window.evaluate_js(f"window.setFontScale({int(scale)})")
+
+    # --- Methods for Python side ---
+
+    def get_current_prompt(self):
+        """Returns the prompt/persona of the currently selected role."""
+        return self.selected_role["persona"] if self.selected_role else ""
 
     def _settings_closed(self, *args):
         self._settings_window = None

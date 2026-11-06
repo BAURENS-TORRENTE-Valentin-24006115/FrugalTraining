@@ -59,6 +59,8 @@ class SettingsManager:
     def __init__(self, models_file=None, roles_file=None, is_admin=None, on_change=None):
         self.models_file = Path(models_file or ROOT / "assets/json/models.json")
         self.roles_file = Path(roles_file or ROOT / "assets/json/personas.json")
+        self.style_file = Path(style_file or ROOT / "assets/json/style.json")
+        self._on_style_change = on_style_change
         self.is_admin = is_admin or (lambda: False)
         self.on_change = on_change or (lambda: None)
 
@@ -110,12 +112,26 @@ class SettingsManager:
         self.on_change()
         return True
 
-    def _delete(self, path, item_id):
-        self._check()
-        with _LOCK:
-            data = [item for item in read_items(path) if item["id"] != item_id]
-            write_items(path, data)
-        self.on_change()
+    def return_exhibition(self):
+        """Ferme la fenêtre des paramètres pour revenir sur l'exposition."""
+        fenetre = self._window_settings or webview.active_window()
+        if fenetre:
+            fenetre.destroy()
+        return True
+
+    def get_style(self):
+        """Returns the saved style (font scale in %)."""
+        data = self._read_json(self.style_file)
+        if not isinstance(data, dict) or "font_scale" not in data:
+            return {"font_scale": 100}
+        return data
+
+    def save_style(self, style):
+        """Saves the style and applies it live on the answering AI window."""
+        scale = max(50, min(200, int(style.get("font_scale", 100))))
+        self._write_json(self.style_file, {"font_scale": scale})
+        if self._on_style_change:
+            self._on_style_change(scale)
         return True
 
     def save_persona(self, item):
@@ -129,3 +145,13 @@ class SettingsManager:
 
     def delete_model(self, item_id):
         return self._delete(self.models_file, item_id)
+  
+  def launch_settings():
+    settings_api = SettingsManager()
+    def _delete(self, path, item_id):
+        self._check()
+        with _LOCK:
+            data = [item for item in read_items(path) if item["id"] != item_id]
+            write_items(path, data)
+        self.on_change()
+        return True
