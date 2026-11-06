@@ -87,7 +87,7 @@ window.addEventListener('pywebviewready', function() {
     });
 });
 
-// --- Taille de police réglable depuis les paramètres ---
+// Font size adjustable via settings
 window.setFontScale = function (scale) {
     fontScale = scale;
     clearInterval(typingInterval);

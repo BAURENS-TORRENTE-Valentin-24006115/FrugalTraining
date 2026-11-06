@@ -92,7 +92,7 @@ class FrugalInterface:
         """Ouvre la fenêtre des paramètres, uniquement si l'admin est connecté."""
         if not self._admin.est_connecte():
             return False
-        panel = settings_manager.SettingsManager(on_style_change=self.appliquer_taille_police)
+        panel = settings_manager.SettingsManager(on_style_change=self.apply_font_size)
         webview.create_window(
             title="Configuration - IA Frugal",
             url="assets/settings.html",
@@ -102,7 +102,7 @@ class FrugalInterface:
         )
         return True     
 
-    def appliquer_taille_police(self, scale):
+    def apply_font_size(self, scale):
         """Applique la taille de police sur la fenêtre de l'IA répondante."""
         self.style["font_scale"] = scale
         if self._answering_window:

@@ -74,7 +74,7 @@ class SettingsManager:
         self._write_json(self.models_file, data)
         return True
 
-    def revenir_exposition(self):
+    def return_exhibition(self):
         """Ferme la fenêtre des paramètres pour revenir sur l'exposition."""
         fenetre = self._window_settings or webview.active_window()
         if fenetre:
