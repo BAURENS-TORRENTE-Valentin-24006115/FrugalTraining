@@ -59,6 +59,7 @@ function editPersona(id) {
     document.getElementById('p-name').value = p.name;
     document.getElementById('p-icon').value = p.icon || '';
     document.getElementById('p-persona').value = p.persona;
+    document.getElementById('p-keybind').value = p.keybind || '';
 }
 
 function savePersona() {
@@ -66,6 +67,7 @@ function savePersona() {
     const name = document.getElementById('p-name').value.trim();
     const icon = document.getElementById('p-icon').value.trim();
     const persona = document.getElementById('p-persona').value.trim();
+    const keybind = document.getElementById('p-keybind').value.trim().toLowerCase();
 
     // Verify non-empty fields
     if (!id || !name || !icon || !persona) {
@@ -79,7 +81,13 @@ function savePersona() {
         return;
     }
 
-    const item = { id, name, icon, persona };
+    // Verify keybind
+    if (!keybind) {
+        alert("La touche de raccourci est obligatoire.");
+        return;
+    }
+
+    const item = { id, name, icon, persona, keybind };
 
     window.pywebview.api.save_persona(item).then(() => {
         loadData();
@@ -101,6 +109,7 @@ function editModel(id) {
     document.getElementById('m-key').value = m.api_key || '';
     document.getElementById('m-image').value = m.image || '';
     document.getElementById('m-score').value = m.score !== undefined ? m.score : 50;
+    document.getElementById('m-keybind').value = m.keybind || '';
 }
 
 function saveModel() {
@@ -108,6 +117,7 @@ function saveModel() {
     const name = document.getElementById('m-name').value.trim();
     const apiKey = document.getElementById('m-key').value.trim();
     const image = document.getElementById('m-image').value.trim();
+    const keybind = document.getElementById('m-keybind').value.trim().toLowerCase();
     const scoreVal = document.getElementById('m-score').value.trim();
 
     // Verify non-empty fields
@@ -128,7 +138,13 @@ function saveModel() {
         return;
     }
 
-    const item = { id, name, api_key: apiKey, image, score };
+    // Verify keybind
+    if (!keybind) {
+        alert("La touche de raccourci est obligatoire.");
+        return;
+    }
+
+    const item = { id, name, api_key: apiKey, image, keybind, score };
 
     window.pywebview.api.save_model(item).then(() => {
         loadData();

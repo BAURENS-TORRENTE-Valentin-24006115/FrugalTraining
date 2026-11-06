@@ -22,6 +22,7 @@ ENV/
 .env
 .venv
 models.json
+admin_password.json
 
 # Build artifacts & logs
 build/
@@ -30,3 +31,6 @@ dist/
 log.*
 ai-server/tests/
 .vscode/mcp.json
+
+# Admin password hash 
+admin_password.json
