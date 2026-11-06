@@ -1,14 +1,19 @@
-const MIN_FONT_SIZE = 1.2; // Minimum readable font size (rem)
-const MAX_FONT_SIZE = 5.0; // Maximum font size for short text (rem)
+const BASE_MIN_FONT_SIZE = 1.2; // Minimum readable font size (rem)
+const BASE_MAX_FONT_SIZE = 5.0; // Maximum font size for short text (rem)
+let fontScale = 100; // Réglage depuis les paramètres (%)
+let lastText = '';
 let typingInterval = null;
 const responseBox = document.getElementById('ai-answer');
 
 function updateLogo(imageUrl) {
-    document.getElementById('logo').src = imageUrl;
+    document.getElementById('logo').src = imageUrl || 'img/models/mistral.png';
 }
 
 function fitTextToScreen() {
     if (!responseBox.textContent.trim()) return;
+
+    const MIN_FONT_SIZE = BASE_MIN_FONT_SIZE * fontScale / 100;
+    const MAX_FONT_SIZE = BASE_MAX_FONT_SIZE * fontScale / 100;
 
     let low = MIN_FONT_SIZE;
     let high = MAX_FONT_SIZE;
@@ -38,44 +43,41 @@ function fitTextToScreen() {
     }
 }
 
-function displayResponse(text, progressive = true) {
-    clearInterval(typingInterval);
-
-    if (!progressive) {
-        responseBox.textContent = text;
-        fitTextToScreen();
-        return;
-    }
-
-    responseBox.textContent = '';
-    let index = 0;
-
-    typingInterval = setInterval(() => {
-        // Use textContent instead of innerText to preserve trailing spaces
-        const char = text.charAt(index);
-        responseBox.textContent += char;
-        index++;
-
-        // Only adjust font scale on spaces/newlines or final character to prevent flickering
-        if (char === ' ' || char === '\n' || index >= text.length) {
-            fitTextToScreen();
-        }
-
-        if (index >= text.length) {
-            clearInterval(typingInterval);
-        }
-    }, 25);
+function displayResponse(text) {
+    responseBox.textContent = text || '';
+    fitTextToScreen();
 }
 
-// Expose functions to Python
+function renderData(data) {
+    const selected = data.models.find(model => model.id === data.selected_model_id);
+    updateLogo(selected && selected.image);
+    displayResponse(data.reponse_ia_repondante);
+}
+
 window.updateLogo = updateLogo;
 window.displayResponse = displayResponse;
+window.renderData = renderData;
 window.addEventListener('resize', fitTextToScreen);
 // Fetch initial data on load
 window.addEventListener('pywebviewready', function() {
     window.pywebview.api.obtenir_donnees().then(function(data) {
+        fontScale = data.font_scale || 100;
         const activeModel = data.models.find(m => m.id === data.selected_model_id);
         if (activeModel) updateLogo(activeModel.image);
         displayResponse(data.reponse_ia_repondante, true);
     });
+});
+
+// Font size adjustable via settings
+window.setFontScale = function (scale) {
+    fontScale = scale;
+    clearInterval(typingInterval);
+    if (lastText) {
+        responseBox.textContent = lastText;
+        fitTextToScreen();
+    }
+};
+
+window.addEventListener('pywebviewready', async () => {
+    renderData(await window.pywebview.api.obtenir_donnees());
 });

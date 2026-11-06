@@ -155,7 +155,6 @@ body {
 .response-panel p {
 	margin: 0 0 5px;
 }
-
 .bottom-panel {
 	display: grid;
 	grid-template-columns: 42% 12% 46%;

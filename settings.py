@@ -18,7 +18,7 @@ AI_ENDPOINTS = {
 
 AI_MODELS = {
     "local": "Ministral-3-3B-Instruct-2512-Q4_K_M.gguf",
-    "deepseek": "deepseek-chat",
+    "deepseek": "deepseek-flash",
     "mistral": "open-mistral-nemo",
     "gemini": "gemini-1.5-pro",
 }

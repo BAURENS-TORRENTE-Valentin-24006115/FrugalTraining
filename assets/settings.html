@@ -8,12 +8,26 @@
 <body>
 
     <div class="sidebar">
-        <button class="nav-btn">Style</button> 
+        <button class="nav-btn" onclick="switchTab('style')">Style</button>
         <button class="nav-btn active" onclick="switchTab('personas')">Personnas</button>
         <button class="nav-btn" onclick="switchTab('models')">IA</button>
+        <button class="nav-btn btn-retour" onclick="pywebview.api.return_exhibition()">Revenir sur l'exposition</button>
     </div>
 
     <div class="content">
+        <!-- STYLE TAB -->
+        <div id="tab-style" class="tab-panel">
+            <h2>Style</h2>
+            <br>
+            <form id="form-style" onsubmit="event.preventDefault(); saveStyle();">
+                <label>Taille de la police de l'IA répondante : <span id="font-scale-value">100</span> %</label>
+                <input type="range" id="s-font-scale" min="50" max="200" step="5" value="100"
+                       oninput="document.getElementById('font-scale-value').textContent = this.value">
+                <div class="btn-group">
+                    <button type="submit" class="btn-save">Enregistrer</button>
+                </div>
+            </form>
+        </div>
         <!-- PERSONAS TAB -->
         <div id="tab-personas" class="tab-panel active">
             <h2>Gestion des Personnas</h2>
@@ -56,9 +70,15 @@
                 
                 <label>Nom (ex: Gemini):</label>
                 <input type="text" id="m-name" required>
+                <label>Fournisseur:</label>
+                <select id="m-provider"><option value="mistral">Mistral</option><option value="gemini">Gemini</option><option value="deepseek">DeepSeek</option><option value="custom">Compatible OpenAI</option></select>
+                <label>Identifiant du modèle API:</label>
+                <input type="text" id="m-model" required>
+                <label>URL de base API (pour fournisseur personnalisé, jusqu'à /v1):</label>
+                <input type="url" id="m-base_url" placeholder="https://exemple.com/v1">
                 
-                <label>Clé API:</label>
-                <input type="password" id="m-key" required>
+                <label>Clé API (facultative si définie dans .env):</label>
+                <input type="password" id="m-key">
                 
                 <label>Image (chemin):</label>
                 <input type="text" id="m-image" value="img/models/gemini.png" required>

@@ -61,7 +61,7 @@ body {
 /* Forms */
 form { background: #252525; padding: 20px; border-radius: 6px; display: flex; flex-direction: column; gap: 12px; }
 label { font-size: 12px; color: #aaa; }
-input, textarea {
+input, textarea, select {
     background: #181818;
     border: 1px solid #444;
     color: white;
@@ -75,3 +75,4 @@ textarea { height: 160px; resize: vertical; }
 .btn-save { background: #28a745; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
 .btn-edit { background: #ffc107; color: black; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
 .btn-delete { background: #dc3545; color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; }
+.btn-retour { position: fixed; bottom: 16px; left: 16px; background-color: #c62828; color: #ffffff; }

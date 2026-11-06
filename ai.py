@@ -48,7 +48,7 @@ class AI:
         max_tokens: int | None = None,
     ) -> None:
         provider = provider.lower()
-        if provider not in AI_ENDPOINTS:
+        if provider not in AI_ENDPOINTS and not base_url:
             raise ValueError(f"Fournisseur inconnu : {provider}")
 
         self.provider = provider
@@ -99,6 +99,8 @@ class AI:
             "stream": True,
             "temperature": self.temperature if temperature is None else temperature,
         }
+        if self.provider == "deepseek":
+            payload["thinking"] = {"type": "disabled"}
         token_limit = self.max_tokens if max_tokens is None else max_tokens
         if token_limit is not None:
             payload["max_tokens"] = token_limit
@@ -180,3 +182,105 @@ class AI:
     ) -> str:
         """Return the complete response."""
         return "".join(self.stream_chat(prompt, keep_history, temperature, max_tokens))
+
+    def stream_completion(
+        self,
+        prompt: str,
+        max_tokens: int,
+        slot_id: int,
+        cache_prompt: bool = True,
+    ) -> Iterator[str]:
+        """Stream a raw llama.cpp completion, optionally reusing a persistent slot cache."""
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "n_predict": max_tokens,
+            "stream": True,
+            "temperature": self.temperature,
+            "cache_prompt": cache_prompt,
+            "id_slot": slot_id,
+        }
+        headers = {"Content-Type": "application/json", "Accept": "text/event-stream"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        request = urllib.request.Request(
+            f"{self.base_url}/completions",
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers=headers,
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=300) as response:
+                if response.headers.get_content_type() == "application/json":
+                    event = json.load(response)
+                    if "error" in event:
+                        error = event["error"]
+                        message = error.get("message", str(error)) if isinstance(error, dict) else str(error)
+                        raise RuntimeError(f"Erreur {self.provider} : {message}")
+                    for choice in event.get("choices", []):
+                        text = choice.get("text") or ""
+                        if text:
+                            yield text
+                    return
+                for raw_line in response:
+                    line = raw_line.decode("utf-8", errors="replace").strip().lstrip("\ufeff")
+                    if not line.startswith("data:"):
+                        continue
+                    data = line[5:].strip()
+                    if not data or data == "[DONE]":
+                        if data == "[DONE]":
+                            break
+                        continue
+                    event = json.loads(data)
+                    if "error" in event:
+                        error = event["error"]
+                        message = error.get("message", str(error)) if isinstance(error, dict) else str(error)
+                        raise RuntimeError(f"Erreur {self.provider} : {message}")
+                    for choice in event.get("choices", []):
+                        text = choice.get("text") or ""
+                        if text:
+                            yield text
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Erreur HTTP {exc.code} ({self.provider}) : {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"Connexion impossible à {self.provider} : {exc.reason}") from exc
+
+    def complete_completion(
+        self,
+        prompt: str,
+        max_tokens: int,
+        slot_id: int,
+        cache_prompt: bool = True,
+    ) -> dict:
+        """Return a non-streaming raw llama.cpp completion and its usage/timing metadata."""
+        payload = {
+            "model": self.model,
+            "prompt": prompt,
+            "n_predict": max_tokens,
+            "stream": False,
+            "temperature": self.temperature,
+            "cache_prompt": cache_prompt,
+            "id_slot": slot_id,
+            "timings_per_token": True,
+        }
+        headers = {"Content-Type": "application/json", "Accept": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+        request = urllib.request.Request(
+            f"{self.base_url}/completions",
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers=headers,
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=300) as response:
+                result = json.load(response)
+        except urllib.error.HTTPError as exc:
+            detail = exc.read().decode("utf-8", errors="replace")
+            raise RuntimeError(f"Erreur HTTP {exc.code} ({self.provider}) : {detail}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"Connexion impossible à {self.provider} : {exc.reason}") from exc
+        if "error" in result:
+            error = result["error"]
+            message = error.get("message", str(error)) if isinstance(error, dict) else str(error)
+            raise RuntimeError(f"Erreur {self.provider} : {message}")
+        return result

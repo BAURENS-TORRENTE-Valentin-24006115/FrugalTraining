@@ -34,3 +34,5 @@ ai-server/tests/
 
 # Admin password hash 
 admin_password.json
+
+temp_audio*.mp3
