@@ -51,7 +51,7 @@ function renderList(kind, items) {
 function editPersona(id) {
     const item = settingsData.personas.find(p => p.id === id);
     if (!item) return;
-    for (const field of ['id', 'name', 'icon', 'persona']) {
+    for (const field of ['id', 'name', 'icon', 'voice', 'persona']) {
         document.getElementById(`p-${field}`).value = item[field] ?? '';
     }
     document.getElementById('p-keybind').value = item.keybind || '';
@@ -68,7 +68,7 @@ function editModel(id) {
 }
 
 async function savePersona() {
-    const item = Object.fromEntries(['id', 'name', 'icon', 'persona'].map(field =>
+    const item = Object.fromEntries(['id', 'name', 'icon', 'voice', 'persona'].map(field =>
         [field, document.getElementById(`p-${field}`).value.trim()]));
     item.keybind = document.getElementById('p-keybind').value.trim().toLowerCase();
     try {
