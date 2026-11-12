@@ -9,7 +9,7 @@
 
     <div class="sidebar">
         <button class="nav-btn" onclick="switchTab('style')">Style</button>
-        <button class="nav-btn active" onclick="switchTab('personas')">Personnas</button>
+        <button class="nav-btn active" onclick="switchTab('personas')">Personas</button>
         <button class="nav-btn" onclick="switchTab('models')">IA</button>
         <button class="nav-btn btn-retour" onclick="pywebview.api.return_exhibition()">Revenir sur l'exposition</button>
     </div>
@@ -30,11 +30,11 @@
         </div>
         <!-- PERSONAS TAB -->
         <div id="tab-personas" class="tab-panel active">
-            <h2>Gestion des Personnas</h2>
+            <h2>Gestion des Personas</h2>
             <br>
             <div id="personas-container" class="item-list"></div>
             
-            <h3>Ajouter / Modifier un Personna</h3>
+            <h3>Ajouter / Modifier un Persona</h3>
             <form id="form-persona" onsubmit="event.preventDefault(); savePersona();">
                 <label>ID (minuscules uniquement, ex: priest):</label>
                 <input type="text" id="p-id" required oninput="this.value = this.value.toLowerCase().replace(/[^a-z0-9_-]/g, '')">
@@ -43,7 +43,7 @@
                 <input type="text" id="p-name" required>
                 
                 <label>Icône (chemin):</label>
-                <input type="text" id="p-icon" value="img/personnas/persona.svg" required>
+                <input type="text" id="p-icon" value="img/personas/persona.svg" required>
 
                 <label>Voix (<a href="https://tts.travisvn.com/" target="_blank">Site qui reference les differentes voix</a>)</label>
                 <input type="text" id="p-voice" required>

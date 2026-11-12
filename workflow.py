@@ -142,7 +142,7 @@ async def sync_stream_to_async_gen(sync_gen) -> AsyncGenerator[str, None]:
 
 
 async def run_cycle(env_values: dict[str, str], model_config: dict | None = None,
-                    persona_prompt: str = "", persona_name: str = "", personna_voice: str = TTS_VOICE ,event_callback=None):
+                    persona_prompt: str = "", persona_name: str = "", persona_voice: str = TTS_VOICE ,event_callback=None):
     """Exécute un cycle complet d'évaluation."""
     def emit(event, value):
         if event_callback:
@@ -164,7 +164,7 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
     print(f"\n[TTS] Prononciation : '{phrase_initiale}'")
     stage_started = time.perf_counter()
     try:
-        await speak_static_text(phrase_initiale, voice=personna_voice)
+        await speak_static_text(phrase_initiale, voice=persona_voice)
     except Exception as e:
         print(f"[!] Avertissement TTS statique : {e}")
     log_measurement(cycle_id, "tts_initiale", time.perf_counter() - stage_started)
@@ -297,7 +297,7 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
         final_chunk_count = 0
         score_emitted = False
         audio_queue: asyncio.Queue = asyncio.Queue()
-        tts_task = asyncio.create_task(llm_stream_to_speech(audio_stream(audio_queue), personna_voice))
+        tts_task = asyncio.create_task(llm_stream_to_speech(audio_stream(audio_queue), persona_voice))
         try:
             async for fragment in sync_stream_to_async_gen(
                 client_local.stream_chat(prompt, keep_history=False, max_tokens=768)

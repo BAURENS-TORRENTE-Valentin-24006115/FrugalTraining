@@ -7,7 +7,7 @@ function displayResponse(text) {
 function renderData(data) {
     document.getElementById('role-header').textContent = `Rôle : ${data.current_role_name}`;
     const personaImage = document.getElementById('persona-image');
-    if (personaImage) personaImage.src = data.current_role_icon || 'img/personnas/persona.svg';
+    if (personaImage) personaImage.src = data.current_role_icon || 'img/personas/persona.svg';
     displayResponse(data.reponse_ia_frugal);
 
     // const chartGrid = document.getElementById('chart-grid');
@@ -33,7 +33,7 @@ function renderData(data) {
         p.disabled = data.running;
         p.classList.toggle('is-selected', role.id === data.selected_role_id);
         // const image = document.createElement('img');
-        // image.src = role.icon || 'img/personnas/persona.svg';
+        // image.src = role.icon || 'img/personas/persona.svg';
         // image.alt = '';
         const label = document.createElement('span');
         label.textContent = role.keybind ? `${role.name} [${role.keybind.toUpperCase()}]|` : role.name;
