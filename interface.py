@@ -285,7 +285,7 @@ class FrugalInterface:
                 start_ai_server()
                 asyncio.run(run_cycle(
                     load_env_file(), model_config=model, persona_prompt=role["persona"],
-                    persona_name=role["name"], personna_voice=role["voice"],
+                    persona_name=role["name"], persona_voice=role["voice"],
                     event_callback=self._workflow_event, wait_for_display=self.wait_for_display,
                 ))
             except Exception as exc:

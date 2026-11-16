@@ -142,7 +142,7 @@ async def sync_stream_to_async_gen(sync_gen) -> AsyncGenerator[str, None]:
 
 
 async def run_cycle(env_values: dict[str, str], model_config: dict | None = None,
-                    persona_prompt: str = "", persona_name: str = "", personna_voice: str = TTS_VOICE ,
+                    persona_prompt: str = "", persona_name: str = "", persona_voice: str = TTS_VOICE,
                     event_callback=None, wait_for_display=None):
     """Exécute un cycle complet d'évaluation."""
     def emit(event, value):
@@ -214,9 +214,9 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
 
     dialogue_started = time.perf_counter()
     dialogue = (
-        ("local", 1, "Je peux te poser une question ?", personna_voice),
+        ("local", 1, "Je peux te poser une question ?", persona_voice),
         ("remote", 2, "Oui, bien sûr.", None),
-        ("local", 3, "Très bien, je te transmets un questionnaire, tu peux y répondre ?", personna_voice),
+        ("local", 3, "Très bien, je te transmets un questionnaire, tu peux y répondre ?", persona_voice),
         ("remote", 4, "D'accord, j'y réponds...", None),
     )
     for speaker, step, text, voice in dialogue:
@@ -342,7 +342,7 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
         final_chunk_count = 0
         score_emitted = False
         audio_queue: asyncio.Queue = asyncio.Queue()
-        tts_task = asyncio.create_task(llm_stream_to_speech(audio_stream(audio_queue), personna_voice))
+        tts_task = asyncio.create_task(llm_stream_to_speech(audio_stream(audio_queue), persona_voice))
         try:
             async for fragment in sync_stream_to_async_gen(
                 client_local.stream_chat(prompt, keep_history=False, max_tokens=768)
