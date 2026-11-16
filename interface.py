@@ -1,4 +1,4 @@
-"""Pont entre les fenêtres pywebview, la configuration et le workflow."""
+"""Bridge between pywebview, application settings, and the evaluation workflow."""
 
 import asyncio
 import json
@@ -28,6 +28,8 @@ class FrugalInterface:
         self._running = False
         self._active_model_id = None
         self._score_recorded_for_cycle = False
+        self._display_waiters = {}
+        self._display_waiters_lock = threading.Lock()
         self.status = "Prêt à lancer un cycle."
         self.reponse_ia_frugal = "En attente de l'évaluation..."
         self.reponse_ia_repondante = "En attente de la réponse du modèle..."
@@ -51,11 +53,14 @@ class FrugalInterface:
         return next((item for item in items if item["id"] == item_id), None)
 
     def _emit_js(self, window, function, *args):
-        if window is not None:
-            try:
-                window.evaluate_js(f"window.{function}({', '.join(json.dumps(a, ensure_ascii=False) for a in args)})")
-            except Exception as exc:
-                print(f"[UI] {function}: {exc}")
+        if window is None:
+            return False
+        try:
+            window.evaluate_js(f"window.{function}({', '.join(json.dumps(a, ensure_ascii=False) for a in args)})")
+            return True
+        except Exception as exc:
+            print(f"[UI] {function}: {exc}")
+            return False
 
     def _broadcast(self):
         data = self.obtenir_donnees()
@@ -65,7 +70,6 @@ class FrugalInterface:
     def obtenir_donnees(self):
         safe_models = [{key: model.get(key) for key in ("id", "name", "image", "score", "keybind")}
                        for model in self.models]
-        scores = [model["score"] for model in safe_models if isinstance(model.get("score"), (int, float))]
         role = self._selected(self.roles, self.selected_role_id)
         safe_roles = [{key: item.get(key) for key in ("id", "name", "icon", "keybind")}
                       for item in self.roles]
@@ -76,10 +80,10 @@ class FrugalInterface:
             "selected_model_id": self.selected_model_id,
             "current_role_name": role["name"] if role else "",
             "current_role_icon": role.get("icon", "") if role else "",
-            "average_score": f"{round(sum(scores) / len(scores)) if scores else 0}/100",
             "reponse_ia_frugal": self.reponse_ia_frugal,
             "reponse_ia_repondante": self.reponse_ia_repondante,
             "font_scale": self.style.get("font_scale", 100),
+            "words_per_second": self.style.get("words_per_second", 3),
             "status": self.status,
             "running": self._running,
         }
@@ -145,23 +149,39 @@ class FrugalInterface:
         self._settings_window.events.closed += self._settings_closed
         return True
 
-    def appliquer_taille_police(self, scale):
-        """Applique la taille de police sur la fenêtre de l'IA répondante."""
+    def appliquer_taille_police(self, scale, words_per_second=None):
+        """Apply display settings to both AI windows."""
         self.style["font_scale"] = scale
-        if self._answering_window:
-            self._answering_window.evaluate_js(f"window.setFontScale({int(scale)})")
+        if words_per_second is not None:
+            self.style["words_per_second"] = words_per_second
+        speed = self.style.get("words_per_second", 3)
+        self._emit_js(self._answering_window, "setDisplaySettings", scale, speed)
+        self._emit_js(self._frugal_window, "setDisplaySettings", scale, speed)
 
-    def apply_font_size(self, scale):
-        """Applique la taille de police sur la fenêtre de l'IA répondante."""
-        self.style["font_scale"] = scale
-        if self._answering_window:
-            self._answering_window.evaluate_js(f"window.setFontScale({int(scale)})")
+    def acknowledge_display(self, display_id):
+        """Receive the UI signal that a paced message has fully appeared."""
+        with self._display_waiters_lock:
+            waiter = self._display_waiters.get(str(display_id))
+        if waiter:
+            waiter.set()
+            return True
+        return False
 
-    # --- Methods for Python side ---
+    def _prepare_display_waiter(self, display_id):
+        with self._display_waiters_lock:
+            self._display_waiters.setdefault(str(display_id), threading.Event())
 
-    def get_current_prompt(self):
-        """Returns the prompt/persona of the currently selected role."""
-        return self.selected_role["persona"] if self.selected_role else ""
+    def wait_for_display(self, display_id):
+        """Block the workflow thread until the answering window finishes a message."""
+        display_id = str(display_id)
+        window = self._answering_window if display_id.endswith("-remote") else self._frugal_window
+        if not window:
+            return
+        with self._display_waiters_lock:
+            waiter = self._display_waiters.setdefault(display_id, threading.Event())
+        waiter.wait()
+        with self._display_waiters_lock:
+            self._display_waiters.pop(display_id, None)
 
     def _settings_closed(self, *args):
         self._settings_window = None
@@ -176,9 +196,9 @@ class FrugalInterface:
 
     def _workflow_event(self, event, value):
         if event == "remote":
-            self.push_answering_ai_response(value)
+            self.push_answering_ai_response(value, progressive=True)
         elif event == "evaluation_chunk":
-            self.push_frugal_ai_response(value, progressive=False)
+            self.push_frugal_ai_response(value, progressive=True)
         elif event == "score":
             self._record_cycle_score(value)
         elif event == "evaluation":
@@ -186,6 +206,29 @@ class FrugalInterface:
             match = re.search(r"Note\s*:\s*(\d{1,3})\s*/\s*100", value, re.I)
             if match:
                 self._record_cycle_score(int(match.group(1)))
+        elif event == "dialogue_local":
+            self.reponse_ia_frugal = value["text"]
+            if self._frugal_window:
+                self._prepare_display_waiter(value["display_id"])
+            if not self._emit_js(self._frugal_window, "finishResponse", value["text"], value["display_id"]):
+                self.acknowledge_display(value["display_id"])
+        elif event == "dialogue_remote":
+            self.reponse_ia_repondante = value["text"]
+            if self._answering_window:
+                self._prepare_display_waiter(value["display_id"])
+            if not self._emit_js(self._answering_window, "finishResponse", value["text"], value["display_id"]):
+                self.acknowledge_display(value["display_id"])
+        elif event == "remote_complete":
+            if self._answering_window:
+                self._prepare_display_waiter(value["display_id"])
+            if not self._emit_js(self._answering_window, "finishResponse", value["text"], value["display_id"]):
+                self.acknowledge_display(value["display_id"])
+        elif event == "evaluation_complete":
+            self.reponse_ia_frugal = value["text"]
+            if self._frugal_window:
+                self._prepare_display_waiter(value["display_id"])
+            if not self._emit_js(self._frugal_window, "finishResponse", value["text"], value["display_id"]):
+                self.acknowledge_display(value["display_id"])
         elif event == "status":
             self.status = value
             self._broadcast()
@@ -230,7 +273,7 @@ class FrugalInterface:
                 asyncio.run(run_cycle(
                     load_env_file(), model_config=model, persona_prompt=role["persona"],
                     persona_name=role["name"], persona_voice=role["voice"],
-                    event_callback=self._workflow_event,
+                    event_callback=self._workflow_event, wait_for_display=self.wait_for_display,
                 ))
             except Exception as exc:
                 self._workflow_event("status", f"Erreur : {exc}")
@@ -244,7 +287,7 @@ class FrugalInterface:
         return {"ok": True, "message": self.status}
 
 
-def launch_windows(http_server=False, debug=False):
+def launch_windows(debug=False):
     import webview
 
     interface = FrugalInterface(webview_module=webview)
@@ -267,7 +310,7 @@ def launch_windows(http_server=False, debug=False):
         x=first.x + half_width if first and not two_screens else None,
         y=first.y if first and not two_screens else None, **window_options,
     )
-    webview.start(http_server=http_server, debug=debug)
+    webview.start(debug=debug)
 
 
 if __name__ == "__main__":

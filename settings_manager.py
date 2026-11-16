@@ -1,4 +1,4 @@
-"""Persistance et API du panneau administrateur."""
+"""Persistence and API methods for the administrator panel."""
 
 import json
 import re
@@ -43,7 +43,6 @@ def read_json(path, default=None):
         with open(path) as f:
             donnees = json.load(f)
     except FileNotFoundError:
-        # aucun mot de passe encore creer        
         return default
     return donnees
 
@@ -84,7 +83,7 @@ class SettingsManager:
         self._check()
         if not isinstance(item, dict) or not _ID.fullmatch(str(item.get("id", ""))):
             raise ValueError("Identifiant invalide.")
-        required = ("name", "icon", "persona") if kind == "persona" else ("name", "provider", "model", "image")
+        required = ("name", "icon", "voice", "persona") if kind == "persona" else ("name", "provider", "model", "image")
         if any(not isinstance(item.get(field), str) or not item[field].strip() for field in required):
             raise ValueError("Champs obligatoires manquants.")
         if kind == "model":
@@ -107,7 +106,7 @@ class SettingsManager:
             item["api_key"] = item["api_key"] or ""
         else:
             keybind = str(item.get("keybind") or "").strip().lower()
-            item = {k: item[k] for k in ("id", "name", "icon", "persona")}
+            item = {k: item[k] for k in ("id", "name", "icon", "voice", "persona")}
             item["keybind"] = keybind
         with _LOCK:
             data = read_items(path)
@@ -121,33 +120,44 @@ class SettingsManager:
         return True
 
     def return_exhibition(self):
-        """Ferme la fenêtre des paramètres pour revenir sur l'exposition."""
+        """Close the settings window and return to the main display."""
         fenetre = webview.active_window()
         if fenetre:
             fenetre.destroy()
         return True
 
     def get_style(self):
-        """Returns the saved style (font scale in %)."""
+        """Return saved display settings, using defaults for invalid values."""
         try:
             data = json.loads(self.style_file.read_text(encoding="utf-8"))
         except (FileNotFoundError, json.JSONDecodeError):
             data = {}
 
-        if not isinstance(data, dict) or "font_scale" not in data:
-            return {"font_scale": 100}
-        return data
+        if not isinstance(data, dict):
+            data = {}
+        try:
+            font_scale = max(50, min(200, int(data.get("font_scale", 100))))
+        except (TypeError, ValueError):
+            font_scale = 100
+        try:
+            words_per_second = max(0.5, min(10.0, float(data.get("words_per_second", 3))))
+        except (TypeError, ValueError):
+            words_per_second = 3.0
+        return {"font_scale": font_scale, "words_per_second": words_per_second}
 
     def save_style(self, style):
-        """Saves the style and applies it live on the answering AI window."""
+        """Save display settings and apply them to open windows."""
         scale = max(50, min(200, int(style.get("font_scale", 100))))
+        words_per_second = max(0.5, min(10.0, float(style.get("words_per_second", 7))))
 
-        # Replaces self._write_json
         self.style_file.parent.mkdir(parents=True, exist_ok=True)
-        self.style_file.write_text(json.dumps({"font_scale": scale}), encoding="utf-8")
+        self.style_file.write_text(json.dumps({
+            "font_scale": scale,
+            "words_per_second": words_per_second,
+        }), encoding="utf-8")
 
         if self._on_style_change:
-            self._on_style_change(scale)
+            self._on_style_change(scale, words_per_second)
         return True
 
     def save_persona(self, item):

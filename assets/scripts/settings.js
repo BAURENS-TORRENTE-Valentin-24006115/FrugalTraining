@@ -107,12 +107,16 @@ function loadStyle() {
     window.pywebview.api.get_style().then(style => {
         document.getElementById('s-font-scale').value = style.font_scale;
         document.getElementById('font-scale-value').textContent = style.font_scale;
+        const speed = style.words_per_second ?? 3;
+        document.getElementById('s-words-per-second').value = speed;
+        document.getElementById('words-per-second-value').textContent = String(speed).replace('.', ',');
     });
 }
 
 function saveStyle() {
     const fontScale = parseInt(document.getElementById('s-font-scale').value, 10);
-    window.pywebview.api.save_style({ font_scale: fontScale });
+    const wordsPerSecond = Number(document.getElementById('s-words-per-second').value);
+    window.pywebview.api.save_style({ font_scale: fontScale, words_per_second: wordsPerSecond });
 }
 
 window.addEventListener('pywebviewready', loadData);

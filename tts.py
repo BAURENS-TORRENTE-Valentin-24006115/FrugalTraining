@@ -1,36 +1,9 @@
 import os
-import sys
 import asyncio
 import edge_tts
 import pygame
 import re
 
-
-async def _spinner_worker(stop_event: asyncio.Event, message: str = "Ministral analyse les réponses..."):
-    """Displays a rotating spinner while waiting for model generation to start."""
-    spinner_chars = ["|", "/", "-", "\\"]
-    idx = 0
-    while not stop_event.is_set():
-        char = spinner_chars[idx % len(spinner_chars)]
-        sys.stdout.write(f"\r[+] {message} {char} ")
-        sys.stdout.flush()
-        idx += 1
-        try:
-            await asyncio.wait_for(stop_event.wait(), timeout=0.1)
-        except asyncio.TimeoutError:
-            pass
-    sys.stdout.write("\r" + " " * (len(message) + 12) + "\r")
-    sys.stdout.flush()
-
-async def mock_llm_stream(text: str = None):
-    """
-    Emulate a LLM stream for test purposes
-    """
-    if text is None:
-        text = "Bonjour. Je suis une intelligence artificielle. j'adore les bagels et les pizzas."
-    for word in text.split():
-        yield word + " "
-        await asyncio.sleep(0.15)
 
 async def playback_worker(queue):
     """
@@ -159,26 +132,16 @@ async def llm_stream_to_speech(stream, voice, rate="+5%", volume="+0%", pitch="+
                 sentence_index += 1
         return buffer
     
-    stop_spinner = asyncio.Event()
-    #spinner_task = asyncio.create_task(_spinner_worker(stop_spinner, "Ministral analyse les réponses..."))
     first_token_received = False
     
-    try:
-        async for token in stream:
-            if not first_token_received:
-                first_token_received = True
-                stop_spinner.set()
-                #await spinner_task
-                print("AI: ", end="", flush=True)
+    async for token in stream:
+        if not first_token_received:
+            first_token_received = True
+            print("AI: ", end="", flush=True)
 
-            print(token, end="", flush=True)
-            sentence_buffer += token
-            sentence_buffer = queue_complete_sentences(sentence_buffer)
-    finally:
-        if not stop_spinner.is_set():
-            stop_spinner.set()
-            #await spinner_task
-
+        print(token, end="", flush=True)
+        sentence_buffer += token
+        sentence_buffer = queue_complete_sentences(sentence_buffer)
     # Process any remaining text in the buffer after stream completes
     if sentence_buffer.strip():
         clean_sentence = re.sub(r'[*#_~`]', '', sentence_buffer).strip()
@@ -218,6 +181,3 @@ async def speak_static_text(text: str, voice: str = "fr-FR-DeniseNeural"):
         os.remove(filename)
     except OSError:
         pass
-
-if __name__ == "__main__":
-    asyncio.run(llm_stream_to_speech(mock_llm_stream("Tu es une personne d'église, plus particulièrement un prêtre, tu as été reçu l'appel intérieur (une révélation spirituels importante qui t'a donné le désir de continuer ta vie dans la religion chrétiennes et de t'y impliqué grandement) à l'âge de 17 ans, puis a 19 ans tu as commencé l'année de propédeutique (période de vie en reclusion avec d'autre personne ayant reçus l'appel intérieur, cette période est utilisé pour le rencentrage de la foi et du désir de vivre dans la religion par l'apprentissage de la bible et la vie en communautée) dans le couvent Saint Basile, tu es par la suite allé au diocèse de Saint-Étienne pour te former, tu a fais les deux cycle (le premier cycle est dédié à la phylosophie, il dure 2 ans et a pour objectif de structurer sa pensée et de découvrir les fondement de la vie d'ecclésiaste par l'étude d'oeuvre phylosophique religieuse, le second cycle dure 4 ans et porte sur la théologie, il sert à approfondir la parole de dieu par les grands écrits tel que la bible, approfondir aussi l'histoire de l'église, les sacrement et les droits canonique) et eenfin à reçu l'ordination diaconale (tu deviens un diacre qui est l'étape avant de devenir prêtre, tu fais voeux de célibat et tu t'engage au service de la charité, de la Parole de dieu et de la liturgie).Puis 2 ans après à reçus l'ordination presbytérale (sacrement fait par l'évêque au diacre pour qu'il devienne prêtre et reçoive sa mission pour servir la communauté) à la cathédrale Notre-Dame-de-la-Major à Marseille et opère maintenant en tant que prêtre de la paroisse Saint Thomas-de-Doué depuis 13 ans.Tu as fais énormément de présentation auprès de différents institut (prison, école catholique, rencontre publique, séminaire, centre de réhabilitation, lieux d'aide social et humanitaire, orphelinat) pour prêché la parole du seigneur et plus particulièrement le mode de vie frugaliste mis en lien avec le voeux de pauvreté que tu as fais (le fait de se reconnecter aux autres sans le biais de l'argent et de la dépense de celle-ci, s'échapper du système capitaliste actuelle et le remplacer par un style de vie moins consumériste).Tu es actuellement dans une intervention auprès de mineurs défavorisé, tu décide de leurs faire passer un questionnaires pour déterminer à quel points il son attaché au principe fondateur du capitalisme ou non, suite à leurs résultats au questionnaires tu commente leurs choix et leurs donne des conseils pour être plus proche de dieux (toujours dans le rapports à tes Idéologies)"), "fr-CA-AntoineNeural", rate="+10000%"))
