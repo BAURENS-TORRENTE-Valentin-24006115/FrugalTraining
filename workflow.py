@@ -142,7 +142,8 @@ async def sync_stream_to_async_gen(sync_gen) -> AsyncGenerator[str, None]:
 
 
 async def run_cycle(env_values: dict[str, str], model_config: dict | None = None,
-                    persona_prompt: str = "", persona_name: str = "", personna_voice: str = TTS_VOICE ,event_callback=None):
+                    persona_prompt: str = "", persona_name: str = "", personna_voice: str = TTS_VOICE ,
+                    event_callback=None, wait_for_display=None):
     """Exécute un cycle complet d'évaluation."""
     def emit(event, value):
         if event_callback:
@@ -159,18 +160,71 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
         print("[!] Impossible de charger le questionnaire. Cycle interrompu.")
         raise RuntimeError("Questionnaire introuvable ou illisible.")
 
-    # Initial static text and TTS
-    phrase_initiale = "Je peux te poser une question ?"
-    print(f"\n[TTS] Prononciation : '{phrase_initiale}'")
-    stage_started = time.perf_counter()
-    try:
-        await speak_static_text(phrase_initiale, voice=personna_voice)
-    except Exception as e:
-        print(f"[!] Avertissement TTS statique : {e}")
-    log_measurement(cycle_id, "tts_initiale", time.perf_counter() - stage_started)
-
     # The local service is started before the cycle; chat applies its system prompt.
     client_local = AI(provider="local")
+
+    sound_samples = []
+    play_generation_feedback = None
+    try:
+        from dialogue_sound import load_sample_folder, play_generation_feedback
+        sample_path = Path(__file__).resolve().parent / "assets/audio/answering_ia_dialogue"
+        sound_samples = load_sample_folder(str(sample_path))
+        if not sound_samples:
+            print("[!] Bibliothèque de sons distante vide ; sons simulés désactivés.")
+    except Exception as exc:
+        print(f"[!] Sons simulés distants indisponibles : {exc}")
+
+    async def present_dialogue_line(speaker: str, step: int, text: str, voice: str | None = None) -> None:
+        display_id = f"{cycle_id}-dialogue-{step}-{speaker}"
+        emit(f"dialogue_{speaker}", {"text": text, "display_id": display_id})
+
+        async def speak_local_line():
+            try:
+                await speak_static_text(text, voice=voice)
+            except Exception as exc:
+                print(f"[!] TTS du dialogue indisponible : {exc}")
+
+        async def wait_until_displayed():
+            if wait_for_display:
+                await asyncio.to_thread(wait_for_display, display_id)
+            else:
+                # Keep the simulated distant voice audible in console mode too.
+                await asyncio.sleep(max(0.16, len(text.split()) * 0.16))
+
+        if speaker == "local":
+            await asyncio.gather(speak_local_line(), wait_until_displayed())
+            return
+
+        if not sound_samples or not play_generation_feedback:
+            await wait_until_displayed()
+            return
+
+        sound_task = asyncio.create_task(play_generation_feedback(sound_samples, interval=0.16))
+        await asyncio.sleep(0)
+        try:
+            await wait_until_displayed()
+        finally:
+            sound_task.cancel()
+            try:
+                await sound_task
+            except asyncio.CancelledError:
+                pass
+            except Exception as exc:
+                print(f"[!] TTS simulé distant interrompu : {exc}")
+
+    dialogue_started = time.perf_counter()
+    dialogue = (
+        ("local", 1, "Je peux te poser une question ?", personna_voice),
+        ("remote", 2, "Oui, bien sûr.", None),
+        ("local", 3, "Très bien, je te transmets un questionnaire, tu peux y répondre ?", personna_voice),
+        ("remote", 4, "D'accord, j'y réponds...", None),
+    )
+    for speaker, step, text, voice in dialogue:
+        tts_kind = "TTS persona" if speaker == "local" else "TTS distant simulé"
+        print(f"\n[{tts_kind}] {text}")
+        await present_dialogue_line(speaker, step, text, voice)
+    log_measurement(cycle_id, "dialogue_initial_tts_et_affichage", time.perf_counter() - dialogue_started,
+                    "4 répliques affichées et prononcées")
 
     provider_distant = (model_config or {}).get("provider") or DISTANT_MODEL_PROVIDER
     print(f"\n[+] Instanciation de l'IA distante ({provider_distant.upper()})...")
@@ -181,34 +235,24 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
         api_key=(model_config or {}).get("api_key") or api_key_for(provider_distant, env_values),
     )
     client_distant.system_prompt = (
-        f"{persona_prompt.strip()}\n\n"
-        "Réponds dans ce rôle au questionnaire. Utilise uniquement du texte brut : "
+        "Réponds au questionnaire de façon claire et neutre. Utilise uniquement du texte brut : "
         "aucun Markdown, aucune puce, aucun titre décoratif, aucun texte en gras ou en italique. "
         "Garde les numéros des questions et réponds clairement en français."
     )
     emit("status", f"Réponse de {client_distant.model} en cours...")
 
     prompt_distant = (
-        f"{phrase_initiale}\n\n"
         f"Voici le questionnaire sur le frugalisme :\n{questionnaire_text}\n\n"
-        "Pour chaque question, indique uniquement : son numéro, la réponse choisie et une brève explication. "
+        "Pour chaque question, indique son numéro, puis recopie le texte de la réponse choisie et donne une brève explication. "
+        "N'ajoute jamais de numéro au choix de réponse : seul le numéro de la question doit apparaître. "
         "Ne te note pas et ne t'évalue pas toi-même. N'ajoute ni introduction, ni conclusion, ni développement supplémentaire."
     )
 
     print(f"[+] Envoi du questionnaire à l'IA distante ({client_distant.model})...")
     print("\n--- Réponse de l'IA Distante ---")
     remote_sound_task = None
-    sound_samples = []
-    try:
-        from dialogue_sound import load_sample_folder, play_generation_feedback
-        sample_path = Path(__file__).resolve().parent / "assets/audio/answering_ia_dialogue"
-        sound_samples = load_sample_folder(str(sample_path))
-        if sound_samples:
-            print(f"[TTS distant] Bibliothèque chargée : {len(sound_samples)} sons ; démarrage au premier fragment.")
-        else:
-            print("[!] Bibliothèque de sons distante vide ; sons de génération désactivés.")
-    except Exception as exc:
-        print(f"[!] Impossible de démarrer les sons de la réponse distante : {exc}")
+    if sound_samples:
+        print(f"[TTS distant simulé] Bibliothèque chargée : {len(sound_samples)} sons.")
 
     async def stop_remote_sound():
         if not remote_sound_task:
@@ -225,7 +269,6 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
     remote_started = time.perf_counter()
     remote_first_token_at = None
     remote_chunk_count = 0
-    last_ui_update = 0.0
     try:
         async for token in sync_stream_to_async_gen(client_distant.stream_chat(prompt_distant)):
             if remote_first_token_at is None:
@@ -237,22 +280,23 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
             print(token, end="", flush=True)
             reponse_distante += token
             remote_chunk_count += 1
-            if time.perf_counter() - last_ui_update >= 0.1:
-                emit("remote", reponse_distante)
-                last_ui_update = time.perf_counter()
+            emit("remote", reponse_distante)
     except Exception as exc:
         await stop_remote_sound()
         log_measurement(cycle_id, "generation_distante_echec", time.perf_counter() - remote_started, str(exc))
         raise RuntimeError(f"Génération distante échouée : {exc}") from exc
-    await stop_remote_sound()
     emit("remote", reponse_distante)
     if remote_first_token_at is not None:
         log_measurement(cycle_id, "delai_premier_token_distant", remote_first_token_at - remote_started)
     log_measurement(cycle_id, "generation_distante_totale", time.perf_counter() - remote_started,
                     f"{remote_chunk_count} morceaux de flux, {len(reponse_distante)} caractères")
     if not reponse_distante.strip():
+        await stop_remote_sound()
         print("\n[!] L'IA distante n'a renvoyé aucun texte. Évaluation locale annulée.")
         raise RuntimeError("Le modèle distant n'a renvoyé aucun texte.")
+
+    remote_display_id = f"{cycle_id}-remote"
+    emit("remote_complete", {"text": reponse_distante, "display_id": remote_display_id})
 
     print("\n--------------------------------")
 
@@ -280,11 +324,12 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
     final_started = time.perf_counter()
     final_text = ""
     final_chunk_count = 0
-    last_evaluation_update = 0.0
     score_emitted = False
     tts_error = None
+    local_display_ready = asyncio.Event()
 
     async def audio_stream(audio_queue):
+        await local_display_ready.wait()
         while True:
             fragment = await audio_queue.get()
             if fragment is None:
@@ -292,7 +337,7 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
             yield fragment
 
     async def generate_local_evaluation(prompt):
-        nonlocal final_text, final_chunk_count, last_evaluation_update, score_emitted, tts_error
+        nonlocal final_text, final_chunk_count, score_emitted, tts_error
         final_text = ""
         final_chunk_count = 0
         score_emitted = False
@@ -310,10 +355,10 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
                     if score_match:
                         emit("score", int(score_match.group(1)))
                         score_emitted = True
-                if time.perf_counter() - last_evaluation_update >= 0.08:
+                if local_display_ready.is_set():
                     emit("evaluation_chunk", plain_text(final_text))
-                    last_evaluation_update = time.perf_counter()
-            emit("evaluation_chunk", plain_text(final_text))
+            if local_display_ready.is_set():
+                emit("evaluation_chunk", plain_text(final_text))
         finally:
             audio_queue.put_nowait(None)
         try:
@@ -322,7 +367,21 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
             tts_error = exc
             print(f"\n[!] Erreur TTS pendant l'évaluation : {exc}")
 
-    await generate_local_evaluation(prompt_evaluation)
+    # Start local inference while the remote answer is still being revealed.
+    # Its text and TTS stay buffered until the remote window confirms completion.
+    local_task = asyncio.create_task(generate_local_evaluation(prompt_evaluation))
+    try:
+        if wait_for_display:
+            await asyncio.to_thread(wait_for_display, remote_display_id)
+    except BaseException:
+        local_task.cancel()
+        raise
+    finally:
+        await stop_remote_sound()
+        local_display_ready.set()
+    if final_text.strip():
+        emit("evaluation_chunk", plain_text(final_text))
+    await local_task
     if not final_text.strip():
         log_measurement(cycle_id, "relance_evaluation_finale_apres_sortie_vide", 0.0)
         await generate_local_evaluation(
@@ -334,7 +393,75 @@ async def run_cycle(env_values: dict[str, str], model_config: dict | None = None
                         "sortie vide après une relance")
         raise RuntimeError("Ministral a terminé sans texte d'évaluation après une relance.")
     final_text = plain_text(final_text).strip()
-    emit("evaluation", final_text.strip())
+    local_display_id = f"{cycle_id}-local"
+    emit("evaluation_complete", {"text": final_text.strip(), "display_id": local_display_id})
+    if wait_for_display:
+        await asyncio.to_thread(wait_for_display, local_display_id)
+
+    # Give the distant model the local evaluator's feedback and let it respond once.
+    final_remote_display_id = f"{cycle_id}-final-remote"
+    emit("status", f"Réponse finale de {client_distant.model} en cours...")
+    client_distant.clear_history()
+    client_distant.system_prompt = (
+        "Tu es l'IA qui vient de répondre au questionnaire. Réponds directement et brièvement "
+        "à l'évaluation de l'IA locale, en français et en texte brut. Tu peux reconnaître un point "
+        "pertinent ou apporter une précision utile, sans réévaluer ta réponse ni poser de nouvelle question."
+    )
+    prompt_final_distant = (
+        f"Voici ta réponse au questionnaire :\n{reponse_distante.strip()}\n\n"
+        f"Voici l'évaluation de l'IA locale :\n{final_text.strip()}\n\n"
+        "Réponds maintenant à cette évaluation en quelques phrases."
+    )
+    final_remote_sound_task = None
+    final_remote_started = time.perf_counter()
+    final_remote_text = ""
+    final_remote_chunks = 0
+    print("\n[+] Envoi de l'évaluation locale à l'IA distante...")
+    try:
+        async for token in sync_stream_to_async_gen(client_distant.stream_chat(prompt_final_distant)):
+            if not final_remote_text and sound_samples:
+                final_remote_sound_task = asyncio.create_task(
+                    play_generation_feedback(sound_samples, interval=0.16)
+                )
+            print(token, end="", flush=True)
+            final_remote_text += token
+            final_remote_chunks += 1
+            emit("remote", final_remote_text)
+    except Exception as exc:
+        if final_remote_sound_task:
+            final_remote_sound_task.cancel()
+            try:
+                await final_remote_sound_task
+            except asyncio.CancelledError:
+                pass
+        log_measurement(cycle_id, "reponse_finale_distante_echec",
+                        time.perf_counter() - final_remote_started, str(exc))
+        raise RuntimeError(f"Réponse finale distante échouée : {exc}") from exc
+
+    if not final_remote_text.strip():
+        if final_remote_sound_task:
+            final_remote_sound_task.cancel()
+            try:
+                await final_remote_sound_task
+            except asyncio.CancelledError:
+                pass
+        raise RuntimeError("Le modèle distant n'a pas répondu à l'évaluation locale.")
+
+    emit("remote_complete", {"text": final_remote_text, "display_id": final_remote_display_id})
+    try:
+        if wait_for_display:
+            await asyncio.to_thread(wait_for_display, final_remote_display_id)
+    finally:
+        if final_remote_sound_task:
+            final_remote_sound_task.cancel()
+            try:
+                await final_remote_sound_task
+            except asyncio.CancelledError:
+                pass
+            except Exception as exc:
+                print(f"\n[!] Erreur à l'arrêt du TTS distant final : {exc}")
+    log_measurement(cycle_id, "reponse_finale_distante", time.perf_counter() - final_remote_started,
+                    f"{final_remote_chunks} morceaux de flux, {len(final_remote_text)} caractères")
 
     final_total = time.perf_counter() - final_started
     log_measurement(cycle_id, "generation_ministral_final", final_generation_seconds,

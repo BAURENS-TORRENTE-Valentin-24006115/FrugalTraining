@@ -128,26 +128,38 @@ class SettingsManager:
         return True
 
     def get_style(self):
-        """Returns the saved style (font scale in %)."""
+        """Returns the saved display settings."""
         try:
             data = json.loads(self.style_file.read_text(encoding="utf-8"))
         except (FileNotFoundError, json.JSONDecodeError):
             data = {}
 
-        if not isinstance(data, dict) or "font_scale" not in data:
-            return {"font_scale": 100}
-        return data
+        if not isinstance(data, dict):
+            data = {}
+        try:
+            font_scale = max(50, min(200, int(data.get("font_scale", 100))))
+        except (TypeError, ValueError):
+            font_scale = 100
+        try:
+            words_per_second = max(0.5, min(10.0, float(data.get("words_per_second", 3))))
+        except (TypeError, ValueError):
+            words_per_second = 3.0
+        return {"font_scale": font_scale, "words_per_second": words_per_second}
 
     def save_style(self, style):
-        """Saves the style and applies it live on the answering AI window."""
+        """Saves display settings and applies them live."""
         scale = max(50, min(200, int(style.get("font_scale", 100))))
+        words_per_second = max(0.5, min(10.0, float(style.get("words_per_second", 3))))
 
         # Replaces self._write_json
         self.style_file.parent.mkdir(parents=True, exist_ok=True)
-        self.style_file.write_text(json.dumps({"font_scale": scale}), encoding="utf-8")
+        self.style_file.write_text(json.dumps({
+            "font_scale": scale,
+            "words_per_second": words_per_second,
+        }), encoding="utf-8")
 
         if self._on_style_change:
-            self._on_style_change(scale)
+            self._on_style_change(scale, words_per_second)
         return True
 
     def save_persona(self, item):

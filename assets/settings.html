@@ -23,6 +23,9 @@
                 <label>Taille de la police de l'IA répondante : <span id="font-scale-value">100</span> %</label>
                 <input type="range" id="s-font-scale" min="50" max="200" step="5" value="100"
                        oninput="document.getElementById('font-scale-value').textContent = this.value">
+                <label for="s-words-per-second">Vitesse d'affichage : <span id="words-per-second-value">3</span> mots par seconde</label>
+                <input type="range" id="s-words-per-second" min="0.5" max="10" step="0.5" value="3"
+                       oninput="document.getElementById('words-per-second-value').textContent = this.value.replace('.', ',')">
                 <div class="btn-group">
                     <button type="submit" class="btn-save">Enregistrer</button>
                 </div>
