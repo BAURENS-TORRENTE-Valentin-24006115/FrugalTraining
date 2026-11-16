@@ -19,23 +19,22 @@ DUREE_SESSION = 10 * 60  # l'admin est déconnecté après 10 minutes
 
 
 def hasher(mot_de_passe, sel):
-    """Calcule le hash du mot de passe avec PBKDF2-SHA256."""
-    # Répéter le calcul rend chaque essai lent qui freine les attaques par force brute
+    """Hash a password with PBKDF2-SHA256."""
+    # The repeated work slows down password guessing.
     resultat = hashlib.pbkdf2_hmac("sha256", mot_de_passe.encode(), sel.encode(), ITERATIONS)
-    # Conversion en texte hexadécimal pour l'enregistrer dans le JSON    
     return resultat.hex()  
 
 
 def enregistrer_mot_de_passe(mot_de_passe):
-    """Enregistre le hash et le sel du mot de passe dans le fichier."""
-    # Sel aléatoire : deux même mots de passe donnent deux hash différents
+    """Save the password hash and salt to disk."""
+    # A random salt gives identical passwords different hashes.
     sel = secrets.token_hex(16)
     with open(FICHIER_MDP, "w") as f:
         json.dump({"sel": sel, "hash": hasher(mot_de_passe, sel)}, f)
 
 
 def initialiser_mot_de_passe(mot_de_passe):
-    """Crée le premier mot de passe une seule fois, de façon atomique."""
+    """Create the first password once, without overwriting an existing file."""
     if len(mot_de_passe) < 8:
         return False
     sel = secrets.token_hex(16)
@@ -48,31 +47,29 @@ def initialiser_mot_de_passe(mot_de_passe):
 
 
 def verifier_mot_de_passe(mot_de_passe):
-    """Renvoie True si le mot de passe correspond au hash enregistré."""
+    """Return whether a password matches the stored hash."""
     try:
         with open(FICHIER_MDP) as f:
             donnees = json.load(f)
     except FileNotFoundError:
-        # aucun mot de passe encore creer
         return False
 
     hash_tape = hasher(mot_de_passe, donnees["sel"])
-    # compare_digest fait la même chose que == mais a toujours le même temps
-    # on ne peut pas deviner le hash en mesurant le temps de réponse
+    # Constant-time comparison avoids timing differences between guesses.
     return hmac.compare_digest(hash_tape, donnees["hash"])
 
 
 class SessionAdmin:
-    """Gère la connexion admin : session, compteur d'erreurs et blocage."""
+    """Manage admin sessions, failed attempts, and temporary lockouts."""
 
     def __init__(self):
-        # Heures stockées en secondes (format de time.time())
+        # Store session deadlines as Unix timestamps.
         self.connecte_jusqua = 0
         self.bloque_jusqua = 0
         self.nb_erreurs = 0
 
     def connexion(self, mot_de_passe):
-        """Renvoie "ok", "faux" ou "bloque"."""
+        """Return 'ok', 'faux', or 'bloque'."""
         maintenant = time.time()
 
         if maintenant < self.bloque_jusqua:
@@ -97,9 +94,9 @@ class SessionAdmin:
         self.connecte_jusqua = 0
 
 
-# Exécuté uniquement avec la commande : python admin_auth.py
+# Run this module directly to initialize the administrator password.
 if __name__ == "__main__":
-    # getpass fonctionne comme input, mais n'affiche pas ce qu'on tape
+    # getpass hides the password while it is entered.
     mdp = getpass("Nouveau mot de passe admin : ")
     confirmation = getpass("Confirmer : ")
 

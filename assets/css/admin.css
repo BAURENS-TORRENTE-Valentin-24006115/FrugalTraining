@@ -1,5 +1,5 @@
 #admin-login {
-    display: none; /* caché au départ */
+    display: none; /* Keep the login dialog hidden until requested. */
     position: fixed;
     top: 0;
     left: 0;

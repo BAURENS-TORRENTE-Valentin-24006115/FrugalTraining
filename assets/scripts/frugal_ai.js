@@ -90,20 +90,6 @@ function renderData(data) {
     if (personaImage) personaImage.src = data.current_role_icon || 'img/personas/persona.svg';
     displayResponse(data.reponse_ia_frugal);
 
-    // const chartGrid = document.getElementById('chart-grid');
-    // const chartLabels = document.getElementById('chart-labels');
-    // chartGrid.replaceChildren();
-    // chartLabels.replaceChildren();
-    // data.models.forEach(model => {
-    //     const bar = document.createElement('i');
-    //     bar.style.height = `${Math.max(0, Math.min(100, model.score || 0))}%`;
-    //     bar.title = `${model.name} : ${model.score || 0}/100`;
-    //     chartGrid.appendChild(bar);
-    //     const label = document.createElement('span');
-    //     label.textContent = model.name;
-    //     chartLabels.appendChild(label);
-    // });
-
     const roles = document.getElementById('roles-list');
     roles.replaceChildren();
     data.roles.forEach(role => {
@@ -112,9 +98,6 @@ function renderData(data) {
         p.className = 'persona-paragraph';
         p.disabled = data.running;
         p.classList.toggle('is-selected', role.id === data.selected_role_id);
-        // const image = document.createElement('img');
-        // image.src = role.icon || 'img/personas/persona.svg';
-        // image.alt = '';
         const label = document.createElement('span');
         label.textContent = role.keybind ? `${role.name} [${role.keybind.toUpperCase()}]|` : role.name;
         p.append(label);
@@ -130,9 +113,6 @@ function renderData(data) {
         p.className = 'model-paragraph';
         p.disabled = data.running;
         p.classList.toggle('is-selected', model.id === data.selected_model_id);
-        // const image = document.createElement('img');
-        // image.src = model.image || 'img/models/mistral.png';
-        // image.alt = '';
         const label = document.createElement('span');
         label.textContent = model.keybind ? `| ${model.name} [${model.keybind.toUpperCase()}]` : model.name;
         p.append(label);

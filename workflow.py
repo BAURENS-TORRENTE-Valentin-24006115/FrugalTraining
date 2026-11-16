@@ -1,7 +1,8 @@
-"""Cycle de questionnaire, évaluation locale et lecture vocale."""
+"""Run the questionnaire, evaluate the remote answer, and speak the result."""
 
 import sys
 import os
+import signal
 import time
 import asyncio
 import threading
@@ -15,6 +16,7 @@ from ai import AI
 from tts import llm_stream_to_speech, speak_static_text
 from settings import (
     DISTANT_MODEL_PROVIDER,
+    AI_SERVER_PORT,
     QUESTIONNAIRE_PATH,
     TTS_VOICE,
     api_key_for,
@@ -30,7 +32,7 @@ def log_measurement(cycle_id: str, name: str, seconds: float, details: str = "")
 
 
 def plain_text(text: str) -> str:
-    """Retire les marqueurs Markdown résiduels du texte destiné à l'écran et au TTS."""
+    """Remove remaining Markdown markers from text shown and spoken by the app."""
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
     text = re.sub(r"(?m)^\s{0,3}(?:#{1,6}\s+|[-*]\s+)", "", text)
     text = re.sub(r"(?<!\w)_([^_\n]+)_(?!\w)", r"\1", text)
@@ -44,8 +46,8 @@ if sys.platform == "win32":
     except Exception:
         pass
 
-def is_local_server_ready(host: str = "127.0.0.1", port: int = 11343) -> bool:
-    """Vérifie si le serveur IA local MAIA Beacon / llama-cpp est opérationnel."""
+def is_local_server_ready(host: str = "127.0.0.1", port: int = AI_SERVER_PORT) -> bool:
+    """Check whether the local MAIA Beacon API is responding."""
     url = f"http://{host}:{port}/v1/models"
     try:
         req = urllib.request.Request(url, headers={"User-Agent": "FrugalTraining-Healthcheck"})
@@ -55,8 +57,47 @@ def is_local_server_ready(host: str = "127.0.0.1", port: int = 11343) -> bool:
         return False
 
 
+def stop_ai_server_process(proc: subprocess.Popen) -> None:
+    """Stop the server process and any child processes it started."""
+    if proc.poll() is not None:
+        return
+
+    if os.name == "nt":
+        try:
+            subprocess.run(
+                ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=20,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+    else:
+        try:
+            os.killpg(proc.pid, signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+        except OSError:
+            proc.terminate()
+
+    try:
+        proc.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        if os.name != "nt":
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            except OSError:
+                proc.kill()
+        else:
+            proc.kill()
+        proc.wait(timeout=10)
+
+
 def start_ai_server() -> Optional[subprocess.Popen]:
-    """Lance le serveur IA local s'il n'est pas déjà actif."""
+    """Start the local AI server if it is not already responding."""
     if is_local_server_ready():
         print("[+] Serveur IA local (MAIA Beacon) déjà actif et prêt.")
         return None
@@ -89,14 +130,12 @@ def start_ai_server() -> Optional[subprocess.Popen]:
         sys.stdout.flush()
         time.sleep(1.5)
 
+    stop_ai_server_process(proc)
     raise RuntimeError("Le serveur IA local n'a pas répondu dans les 5 minutes.")
 
 
 def load_questionnaire(pdf_path: Path) -> str:
-    """
-    Extrait le texte du fichier Questionnaire.pdf pour l'envoyer aux IA.
-    Les endpoints HTTP standard (/v1/chat/completions) reçoivent le texte extrait du PDF.
-    """
+    """Extract questionnaire text for the remote and local models."""
     if not pdf_path.exists():
         print(f"[!] Fichier {pdf_path} introuvable.")
         return ""
@@ -117,7 +156,7 @@ def load_questionnaire(pdf_path: Path) -> str:
 
 
 async def sync_stream_to_async_gen(sync_gen) -> AsyncGenerator[str, None]:
-    """Exécute le flux synchrone dans un thread d'arrière-plan pour laisser l'event loop asyncio libre d'animer le spinner."""
+    """Bridge a synchronous model stream into the running asyncio loop."""
     queue = asyncio.Queue()
     loop = asyncio.get_running_loop()
 
@@ -144,7 +183,7 @@ async def sync_stream_to_async_gen(sync_gen) -> AsyncGenerator[str, None]:
 async def run_cycle(env_values: dict[str, str], model_config: dict | None = None,
                     persona_prompt: str = "", persona_name: str = "", persona_voice: str = TTS_VOICE,
                     event_callback=None, wait_for_display=None):
-    """Exécute un cycle complet d'évaluation."""
+    """Run one complete questionnaire and evaluation cycle."""
     def emit(event, value):
         if event_callback:
             event_callback(event, value)
@@ -480,10 +519,10 @@ async def main_async():
 
     env_values = load_env_file()
 
-    # Start or verify the local AI server
+    # Start or verify the local AI server before entering the cycle loop.
     start_ai_server()
 
-    # Interactive loop for starting cycles (Y/N)
+    # Ask whether to start another evaluation cycle.
     while True:
         try:
             choix = input("\nVoulez-vous lancer un cycle ? (Y/N) : ").strip().upper()

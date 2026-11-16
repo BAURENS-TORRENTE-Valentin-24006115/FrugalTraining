@@ -1,16 +1,26 @@
 """Application configuration and .env loading helpers."""
 
+import json
 import os
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent
+AI_SERVER_CONFIG = ROOT / "ai-server" / "config.json"
+AI_SERVER_PORT = 11343
+# Read the server's configured port so every local API call uses the same endpoint.
+try:
+    with AI_SERVER_CONFIG.open(encoding="utf-8") as config_file:
+        AI_SERVER_PORT = int(json.load(config_file).get("beacon_port", AI_SERVER_PORT))
+except (OSError, ValueError, TypeError, AttributeError):
+    pass
+
 DISTANT_MODEL_PROVIDER = "mistral"
 TTS_VOICE = "fr-FR-DeniseNeural"
 QUESTIONNAIRE_PATH = ROOT / "Questionnaire.pdf"
 
 AI_ENDPOINTS = {
-    "local": "http://127.0.0.1:11343/v1",
+    "local": f"http://127.0.0.1:{AI_SERVER_PORT}/v1",
     "deepseek": "https://api.deepseek.com/v1",
     "mistral": "https://api.mistral.ai/v1",
     "gemini": "https://generativelanguage.googleapis.com/v1beta/openai",

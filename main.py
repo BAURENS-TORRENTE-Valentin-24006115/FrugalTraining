@@ -1,4 +1,4 @@
-"""Point d'entrée du programme."""
+"""Application entry point."""
 
 import asyncio
 import argparse

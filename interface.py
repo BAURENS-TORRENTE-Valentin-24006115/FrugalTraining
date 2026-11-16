@@ -1,4 +1,4 @@
-"""Pont entre les fenêtres pywebview, la configuration et le workflow."""
+"""Bridge between pywebview, application settings, and the evaluation workflow."""
 
 import asyncio
 import json
@@ -70,7 +70,6 @@ class FrugalInterface:
     def obtenir_donnees(self):
         safe_models = [{key: model.get(key) for key in ("id", "name", "image", "score", "keybind")}
                        for model in self.models]
-        scores = [model["score"] for model in safe_models if isinstance(model.get("score"), (int, float))]
         role = self._selected(self.roles, self.selected_role_id)
         safe_roles = [{key: item.get(key) for key in ("id", "name", "icon", "keybind")}
                       for item in self.roles]
@@ -81,7 +80,6 @@ class FrugalInterface:
             "selected_model_id": self.selected_model_id,
             "current_role_name": role["name"] if role else "",
             "current_role_icon": role.get("icon", "") if role else "",
-            "average_score": f"{round(sum(scores) / len(scores)) if scores else 0}/100",
             "reponse_ia_frugal": self.reponse_ia_frugal,
             "reponse_ia_repondante": self.reponse_ia_repondante,
             "font_scale": self.style.get("font_scale", 100),
@@ -152,18 +150,13 @@ class FrugalInterface:
         return True
 
     def appliquer_taille_police(self, scale, words_per_second=None):
-        """Applique les réglages d'affichage aux fenêtres d'IA."""
+        """Apply display settings to both AI windows."""
         self.style["font_scale"] = scale
         if words_per_second is not None:
             self.style["words_per_second"] = words_per_second
         speed = self.style.get("words_per_second", 3)
         self._emit_js(self._answering_window, "setDisplaySettings", scale, speed)
         self._emit_js(self._frugal_window, "setDisplaySettings", scale, speed)
-
-    def apply_font_size(self, scale):
-        """Compatibility alias for font size updates."""
-        self.style["font_scale"] = scale
-        self.appliquer_taille_police(scale)
 
     def acknowledge_display(self, display_id):
         """Receive the UI signal that a paced message has fully appeared."""
@@ -189,12 +182,6 @@ class FrugalInterface:
         waiter.wait()
         with self._display_waiters_lock:
             self._display_waiters.pop(display_id, None)
-
-    # --- Methods for Python side ---
-
-    def get_current_prompt(self):
-        """Returns the prompt/persona of the currently selected role."""
-        return self.selected_role["persona"] if self.selected_role else ""
 
     def _settings_closed(self, *args):
         self._settings_window = None
@@ -300,7 +287,7 @@ class FrugalInterface:
         return {"ok": True, "message": self.status}
 
 
-def launch_windows(http_server=False, debug=False):
+def launch_windows(debug=False):
     import webview
 
     interface = FrugalInterface(webview_module=webview)
@@ -323,7 +310,7 @@ def launch_windows(http_server=False, debug=False):
         x=first.x + half_width if first and not two_screens else None,
         y=first.y if first and not two_screens else None, **window_options,
     )
-    webview.start(http_server=http_server, debug=debug)
+    webview.start(debug=debug)
 
 
 if __name__ == "__main__":
