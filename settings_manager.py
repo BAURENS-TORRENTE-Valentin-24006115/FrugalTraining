@@ -148,7 +148,7 @@ class SettingsManager:
     def save_style(self, style):
         """Save display settings and apply them to open windows."""
         scale = max(50, min(200, int(style.get("font_scale", 100))))
-        words_per_second = max(0.5, min(10.0, float(style.get("words_per_second", 3))))
+        words_per_second = max(0.5, min(10.0, float(style.get("words_per_second", 7))))
 
         self.style_file.parent.mkdir(parents=True, exist_ok=True)
         self.style_file.write_text(json.dumps({
