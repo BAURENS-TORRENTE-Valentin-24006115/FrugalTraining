@@ -28,6 +28,7 @@ def activer_blocage(est_admin):
             return True
 
         nom = (event.name or "").lower()
+        print("TOUCHE:", event.event_type, repr(nom), "ctrl:", keyboard.is_pressed("ctrl"), "shift:", keyboard.is_pressed("shift"))  # TEST, à enlever        
 
         # Shift et Ctrl sont autorisés pour les majuscules et pour Ctrl + Shift + A
         if "shift" in nom or "ctrl" in nom:
@@ -45,7 +46,6 @@ def activer_blocage(est_admin):
         if keyboard.is_pressed("ctrl"):
             return nom == "a" and keyboard.is_pressed("shift")
 
-        # Lettre, chiffre ou symbole seul : autorisé
         return True
 
     # suppress=True : une touche pour laquelle filtrer renvoie False n'arrive jamais à Windows
