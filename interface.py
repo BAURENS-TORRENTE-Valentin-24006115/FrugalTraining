@@ -9,6 +9,7 @@ from pathlib import Path
 
 import admin_auth
 import settings_manager
+import blocage_clavier
 from settings import api_key_for, load_env_file
 
 ROOT = Path(__file__).resolve().parent
@@ -310,6 +311,8 @@ def launch_windows(debug=False):
         x=first.x + half_width if first and not two_screens else None,
         y=first.y if first and not two_screens else None, **window_options,
     )
+    if not debug:
+        blocage_clavier.activer_blocage(interface.est_admin)
     webview.start(debug=debug)
 
 
